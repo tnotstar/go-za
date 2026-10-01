@@ -1,0 +1,56 @@
+# Workspace Agent Router
+
+This is a private multi-repository AI/development workspace managed by `za`.
+
+## Non-negotiable rules
+
+- Private AI context lives only under `.agents/context/`.
+- Top-level project directories registered in `.gitmodules` are PUBLIC Git submodules.
+- `<project>/openspec/**` is PUBLIC. Write only publishable content there.
+- `.worktrees/**` holds task checkouts: execution state, not projects and not context.
+- Never recursively scan `.worktrees/`.
+- `.gitignore` is workspace hygiene only; never rely on it for confidentiality.
+- Never commit secret values anywhere.
+- Select one active project by default. The normal context boundary is GLOBAL plus that one PROJECT.
+- Do not read sibling project context unless the task explicitly spans projects.
+
+## Resolve the active project
+
+1. Project explicitly named by the task.
+2. Project containing a path explicitly named by the task.
+3. Inside `.worktrees/<id>/<task-id>/...`: project `<id>`.
+4. Inside `<id>/...` where `<id>` is a registered submodule path: project `<id>`.
+5. The single project affected by the relevant Git diff.
+
+If more than one candidate remains and the task is not explicitly multi-project, do not guess.
+
+## Projects
+
+<!-- za:projects:start -->
+_No projects registered._
+<!-- za:projects:end -->
+
+## Loading protocol
+
+1. Global MUST rules: `.agents/context/_global/policy.md`.
+2. Read only the selected project's `.agents/context/projects/<id>/INDEX.md`.
+3. Follow `.agents/context/_global/roles.md` for the active role.
+4. Load a language standard only when the task involves that language:
+   - Go: `.agents/context/_global/go-standards.md`
+5. Before a write task, confirm the project's pinned gitlink, checkout, upstream and `status.md` verification SHA agree.
+6. For normal writes, work in `.worktrees/<id>/<task-id>/`.
+7. Load more context only when a documented trigger applies.
+8. Stop reading once authority, constraints, workspace mode, validation commands and target area are known.
+
+## Workspace rules
+
+- Root `go.work` is a private integration overlay.
+- Root workspaces reference canonical submodule checkouts only and never replace a project's own dependency metadata.
+- Task worktrees are never permanent members of root language workspaces.
+- Workspace validation and standalone validation are different checks; one never substitutes for the other.
+
+## Context budget
+
+- Router: max 4 KiB. Project index: max 3 KiB.
+- Context before source inspection: max 8,000 tokens; total per task: max 12,000 tokens.
+- Inspect source code progressively; never bulk-preload it.

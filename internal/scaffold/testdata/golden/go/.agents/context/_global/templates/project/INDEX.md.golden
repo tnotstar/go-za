@@ -1,0 +1,43 @@
+# Project Context: <project-id>
+
+Summary: <decide: one sentence describing this project's responsibility>
+
+- Canonical checkout: `<project-id>/`
+- Public OpenSpec: `<project-id>/openspec/`
+- Private context: `.agents/context/projects/<project-id>/`
+- Task worktrees: `.worktrees/<project-id>/<task-id>/`
+- Language/runtime: <discover: go | python-uv | mixed | other>
+- Canonical workspace participation: <decide: go | uv | both | none>
+- Tracking branch: read `submodule.<project-id>.branch` from `.gitmodules`
+
+## Read map
+
+| Need | Read | Trigger |
+|---|---|---|
+| Build/test/lint/generate/release | `tools.md` | Before invoking project commands |
+| Hard architecture rules | `constraints.md` | Before modifying code/design |
+| Existing technical decision | `decisions/` | Only when the task touches that decision |
+| API/schema/config/version authority | `source-of-truth.md` | Before changing a contract or generated artifact |
+| Current work / known blockers | `status.md` | Continuing or coordinating in-flight work |
+| Current observable behavior | `<project-id>/openspec/specs/` | Behavior-dependent task |
+| Proposed behavior | `<project-id>/openspec/changes/<change>/` | Task belongs to an active change |
+
+## Freshness gate
+
+Before modifying this project, confirm that these revisions agree:
+
+- the pinned gitlink (`git ls-files -s <project-id>`);
+- the canonical checkout `HEAD`;
+- the fetched upstream tracking branch;
+- `Verified against gitlink` in `status.md`.
+
+Do not claim that the project is current if upstream freshness could not be checked.
+
+## Stop condition
+
+Stop loading context when you can identify:
+
+1. the authoritative requirement/change;
+2. every applicable MUST constraint;
+3. the validation commands and validation mode;
+4. the specific implementation/test area to inspect next.

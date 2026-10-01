@@ -1,0 +1,22 @@
+# Glossary
+
+Summary: Cross-project vocabulary established by the workspace architecture. Project or domain terms belong in project context or public OpenSpec, not here.
+
+| Term | Definition |
+|---|---|
+| Meta-repository | This private Git repository: the workspace root holding private context, integration workspace files and the public projects as submodules. |
+| Project | A public repository mounted as a top-level Git submodule. Its ID, submodule name and directory name are identical. |
+| GLOBAL context | Level 1 context under `.agents/context/_global/`, inherited by every project. |
+| PROJECT context | Level 2 private context under `.agents/context/projects/<id>/`, inheriting from GLOBAL. |
+| MUST | A global invariant that no project or ADR can weaken. |
+| DEFAULT | A global rule inherited unless a project explicitly replaces it. |
+| Gitlink | The submodule commit recorded by the meta-repository for a project (the pinned SHA). |
+| Canonical checkout | The submodule checkout at `<id>/`, at the pinned gitlink; the reproducible baseline. |
+| Verified SHA | The gitlink SHA recorded in a project's `status.md`, against which its private context was last reviewed. |
+| Drift | Any disagreement between the pinned gitlink, the canonical checkout `HEAD`, the upstream tracking branch and the verified SHA. |
+| Task worktree | A linked Git worktree of one public project at `.worktrees/<id>/<task-id>/`: local, ephemeral execution state. |
+| Integration workspace | The private root Go and/or uv workspace joining canonical checkouts for cross-project work. |
+| Standalone validation | Validating a public project exactly as if it were cloned independently, without the private workspace. |
+| Workspace validation | Validating with the private integration workspace intentionally active. |
+| OpenSpec | A project's public functional specification under `<id>/openspec/`. |
+| ADR | Architecture Decision Record: a private project decision under `.agents/context/projects/<id>/decisions/`. |

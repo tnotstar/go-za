@@ -1,0 +1,16 @@
+# Architectural Constraints: <project-id>
+
+Summary: Hard project-specific rules. Every rule must be objectively checkable.
+
+| ID | Rule | Verification |
+|---|---|---|
+| ARC-001 | <decide: precise MUST/MUST NOT invariant> | <decide: command, test, query, or deterministic inspection> |
+
+## Authoring rules
+
+- One invariant per row.
+- Use MUST/MUST NOT language.
+- Do not encode preferences as constraints.
+- Do not add a constraint without a verification method.
+- Project constraints may strengthen, but never weaken, global MUST rules.
+- Delete the placeholder row if the project has no hard constraints yet.

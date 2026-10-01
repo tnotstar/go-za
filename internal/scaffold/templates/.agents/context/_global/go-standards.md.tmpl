@@ -1,0 +1,14 @@
+# Go Workspace Standards
+
+Summary: Architecture-level Go workspace conventions. Load only for Go tasks. Code style, linters and frameworks belong in each project's own context.
+
+## MUST
+
+- G-01 Each public Go project keeps its own `go.mod` and `go.sum`; they are its dependency authority. Root `go.work` is a private integration overlay, never a replacement.
+- G-02 Root `go.work` lists only actual Go module roots of canonical checkouts (`./<id>`).
+- G-03 Root `go.work` never references a task worktree. Never edit it to point at one developer's or agent's task.
+- G-04 Standalone validation in a task worktree sets `GOWORK=off`. Without it, Go discovers the root `go.work` by walking parent directories.
+- G-05 Never rely on implicit workspace discovery inside `.worktrees/`.
+- G-06 To test a task worktree against canonical sibling modules, generate an ephemeral workspace file under `.agents/runtime/go-workspaces/` and select it explicitly with `GOWORK=<absolute path>`.
+- G-07 `go.work.sum` is written by the Go toolchain, never by hand. When it exists, commit it with `go.work`.
+- G-08 Workspace success never substitutes for standalone success.

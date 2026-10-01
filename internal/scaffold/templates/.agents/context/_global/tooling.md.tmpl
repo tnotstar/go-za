@@ -1,0 +1,49 @@
+# Tooling
+
+Summary: Shared tools and command conventions. A project's `tools.md` defines its exact invocations and wins over these defaults.
+
+## za
+
+- `za` is the canonical command for managing this workspace's architecture.
+- It replaces hand-written management scripts: never add shell, Python or Make scripts under `.agents/` that duplicate workspace-management behavior.
+- Available: `za init`, already applied to this workspace.
+- Until a `za` subcommand covers a task (adding a project, checking drift, creating or removing worktrees), perform it with the native tools below, following `policy.md`.
+
+## Native tools
+
+Native tools are used directly; their behavior is never emulated by hand.
+
+| Tool | Role in this workspace |
+|---|---|
+| `git` | Repository, submodule (`.gitmodules`, gitlinks) and worktree mechanism. |
+{{- if .Go}}
+| `go` | Go toolchain. Owns root `go.work` and `go.work.sum`; change membership with `go work use`. |
+{{- end}}
+{{- if .Python}}
+| `uv` | Python project manager. Owns workspace resolution and every `uv.lock`. |
+{{- end}}
+
+## Conventions
+
+- Run commands directly with explicit arguments and working directories.
+- Prefer project-owned entry points (scripts, Make/Task targets, CI-equivalent commands) documented in project `tools.md` over reconstructed command lines.
+- Every documented command states its mode: `standalone` or `workspace`.
+{{- if .Go}}
+- Go standalone commands in task worktrees set `GOWORK=off`; see `go-standards.md`.
+{{- end}}
+{{- if .Python}}
+- uv standalone validation runs from an excluded task worktree with the project's own `pyproject.toml` and `uv.lock`; see `python-standards.md`.
+{{- end}}
+- Capabilities a project requires (OpenSpec CLI, agent skills, plugins) are listed in its `tools.md`.
+
+## Project context templates
+
+`templates/project/` is the single scaffold source for new project contexts. Placeholders state who supplies each value:
+
+| Placeholder | Supplied by |
+|---|---|
+| `<project-id>`, `<full-submodule-SHA>`, `YYYY-MM-DD` | Structure: known when the project is added. |
+| `<discover: ...>` | Inspection of the public repository (paths, commands, runtime). |
+| `<decide: ...>` | A human decision (summary, constraints, decisions, plans). |
+
+Never replace a placeholder with an invented fact. Use `not applicable` when a row does not apply.

@@ -1,0 +1,20 @@
+# Store and check out every text file with LF on all platforms, regardless of
+# core.autocrlf. The scaffold templates are embedded byte-for-byte and the
+# golden tests compare exact bytes, so CRLF checkouts on Windows would break
+# both the generated workspaces and the test suite.
+* text=auto eol=lf
+
+# Go sources and module files.
+*.go    text eol=lf diff=golang
+go.mod  text eol=lf
+go.sum  text eol=lf
+
+# Make requires tab-indented recipes and LF-terminated lines.
+Makefile text eol=lf
+
+# Embedded scaffold templates and their expected rendered output.
+*.tmpl   text eol=lf
+*.golden text eol=lf
+
+# Generated golden files: collapse them in GitHub diffs and language stats.
+internal/scaffold/testdata/golden/** linguist-generated=true

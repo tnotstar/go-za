@@ -1,0 +1,22 @@
+# Architecture Principles
+
+Summary: Cross-project principles for how context, specifications and workspaces relate. Application-architecture choices are not made here; each project records its own in `constraints.md` and ADRs.
+
+## MUST
+
+- A-01 Public behavior lives once: in each project's public OpenSpec. Private context links to it and never copies it.
+- A-02 Private AI context lives once: under `.agents/context/`.
+- A-03 Root language workspaces describe canonical submodule checkouts only.
+- A-04 Workspace validation never replaces standalone public-project validation.
+- A-05 No project depends on the private workspace for its public build or test correctness.
+- A-06 Every project context records the exact public gitlink SHA it was verified against, in `status.md`.
+
+## DEFAULT
+
+- A-07 Progressive disclosure: route first, load context on demand, stop as soon as the task is answerable.
+- A-08 Link; do not copy. One topic per file, with a short summary at the top and a stable filename.
+- A-09 Create or update a public OpenSpec change only when a functional contract changes: observable behavior, public API semantics, user-visible errors or externally meaningful configuration semantics. Behavior-preserving refactors, and bug fixes against a correct specification, need no new proposal.
+- A-10 Publishable intent, scope and design belong in public OpenSpec; confidential technical rationale belongs in private ADRs.
+- A-11 Project constraints are single, objectively verifiable MUST/MUST NOT rules, each with a verification method. Preferences are not constraints.
+- A-12 `status.md` stays short and current. Git history, archived OpenSpec changes and ADRs are the historical record.
+- A-13 When a document repeatedly exceeds its size ceiling, split it by topic or capability.

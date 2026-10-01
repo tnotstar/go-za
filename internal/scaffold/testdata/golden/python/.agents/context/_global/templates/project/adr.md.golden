@@ -1,0 +1,35 @@
+# ADR-<NNNN>: <decide: title>
+
+- Status: Proposed | Accepted | Rejected | Superseded
+- Date: YYYY-MM-DD
+- Scope: <decide: project/component>
+- Related OpenSpec: <public path or "none">
+- Supersedes: <ADR id or "none">
+
+## Context
+
+<decide: why a technical decision is required. Include only the facts needed to understand the decision. Confidential business or operational rationale may live here.>
+
+## Decision
+
+<decide: the selected technical decision.>
+
+## Consequences
+
+### Positive
+
+<decide: expected benefits>
+
+### Negative / trade-offs
+
+<decide: costs, limitations, migration burden, operational impact>
+
+## Alternatives considered
+
+<decide: only alternatives that materially influenced the decision.>
+
+## Verification
+
+<decide: how an agent can determine that the implementation still follows this ADR.>
+
+An ADR may override a global DEFAULT, never a global MUST, and never redefines observable behavior without a corresponding public OpenSpec change.

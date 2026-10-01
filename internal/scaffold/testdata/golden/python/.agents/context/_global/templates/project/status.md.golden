@@ -1,0 +1,17 @@
+# Project Status: <project-id>
+
+- Phase: <decide: bootstrap | active-development | maintenance>
+- Last verified: YYYY-MM-DD
+- Verified against gitlink: `<full-submodule-SHA>`
+
+## In progress
+
+- none
+
+## Known issues
+
+- none
+
+## Next steps
+
+- <decide: at most three concrete items>

@@ -1,0 +1,18 @@
+# Source of Truth: <project-id>
+
+Summary: Where each kind of project information is authoritative. Every path must exist or be marked `not applicable`; never list hypothetical paths.
+
+| Information | Authoritative location | Visibility | Derived / secondary | Read trigger |
+|---|---|---|---|---|
+| Current observable behavior | `<project-id>/openspec/specs/` | Public | Code/tests | Behavior work |
+| Proposed behavior | `<project-id>/openspec/changes/<change>/` | Public | In-flight implementation | Assigned change |
+| API contract | <discover: actual path or not applicable> | <discover: Public/Private> | <discover: generated outputs> | API change |
+| Database/schema | <discover: actual path or not applicable> | <discover: Public/Private> | <discover: generated outputs> | Schema change |
+| Configuration keys/defaults | <discover: actual path or not applicable> | <discover: Public/Private> | Documentation | Config change |
+| Go dependencies | <discover: `<project-id>/go.mod` or not applicable> | Public | `<project-id>/go.sum` | Go dependency work |
+| Python dependencies | <discover: `<project-id>/pyproject.toml` or not applicable> | Public | `<project-id>/uv.lock` | Python dependency work |
+| Canonical Go integration overlay | <discover: `/go.work` or not applicable> | Private | `/go.work.sum` | Cross-project Go integration |
+| Canonical Python integration overlay | <discover: `/pyproject.toml` + `/uv.lock` or not applicable> | Private | workspace environment | Cross-project Python integration |
+| Build/release implementation | <discover: Makefile/script/CI path> | Public | `tools.md` invocation index | Tooling work |
+| Technical decisions | `.agents/context/projects/<project-id>/decisions/` | Private | None | Architecture question |
+| Execution status | `.agents/context/projects/<project-id>/status.md` | Private | None | In-flight work |

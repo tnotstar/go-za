@@ -1,0 +1,47 @@
+# Global Policy
+
+Summary: Non-overridable rules for every project and agent in this workspace.
+
+## Rule strength
+
+- **MUST** rules are invariants. No project context, constraint or ADR may weaken or override them; projects may only strengthen them.
+- **DEFAULT** rules are inherited unless a project explicitly replaces them, normally through an accepted ADR.
+
+Every rule in this file is a MUST.
+
+## Repository boundary
+
+- P-01 Private AI context lives only under `.agents/context/` in this private meta-repository.
+- P-02 Top-level project directories registered in `.gitmodules` are PUBLIC repositories. Private context never goes inside them.
+- P-03 Every file under `<project>/openspec/` is publishable by definition. Public OpenSpec and source never reference or depend on `.agents/context/`.
+- P-04 A public repository remains understandable, buildable and testable without this meta-repository.
+- P-05 `.gitignore` is workspace hygiene only. Confidentiality depends on repository topology and review, never on ignore rules.
+- P-06 `.worktrees/**` and `.agents/runtime/**` are never tracked by the meta-repository.
+- P-07 Top-level projects are true Git submodules (gitlinks), never absorbed directories.
+
+## Secrets
+
+- P-08 Secret values, credentials, private keys, tokens and passwords are never committed anywhere, public or private.
+- P-09 Private context may record secret names, environment-variable names and retrieval procedures, never values.
+
+## Context isolation
+
+- P-10 Context has exactly two levels: GLOBAL (`.agents/context/_global/`) and PROJECT (`.agents/context/projects/<id>/`).
+- P-11 Work with one active project unless the task is explicitly multi-project. Multi-project tasks process project contexts sequentially.
+- P-12 A project context is understandable from GLOBAL, that project's private context and that project's public repository alone. It never requires, and is never authoritative for, another project.
+- P-13 When switching projects, retain only GLOBAL context and load the new project from zero.
+
+## Execution state
+
+- P-14 Task worktrees under `.worktrees/<id>/<task-id>/` are execution state, not context and not additional projects. Inspect only the active one; never scan `.worktrees/` recursively.
+- P-15 Normal writable work happens in a task worktree created from the verified gitlink SHA, not in the canonical checkout.
+- P-16 A normal write task stops when upstream freshness or context verification is stale. When freshness cannot be established, say so; never claim it.
+- P-17 Remove task worktrees through Git (`git worktree remove`, then `git worktree prune`). Never run destructive `git clean` over `.worktrees/`.
+
+## Authority
+
+- P-18 Observable behavior: assigned active OpenSpec change > current OpenSpec spec > implementation > private notes.
+- P-19 Technical architecture: global MUST > accepted project ADR > global DEFAULT. An ADR never overrides a MUST and never redefines observable behavior without a public OpenSpec change.
+- P-20 Dependencies: public project dependency files > private workspace overlays.
+- P-21 `status.md` is informational only and never overrides specifications or rules.
+- P-22 When code and specification disagree, determine which is stale and repair that source of truth. Never silently choose the convenient one.

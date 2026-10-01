@@ -1,0 +1,43 @@
+# Agent Roles
+
+Summary: Progressive-loading contracts for DESIGN, CODING and TESTING agents. These are MUST rules; projects may add stricter triggers but never weaken them.
+
+## Stop criterion (all roles)
+
+Stop loading context once all five are known:
+
+1. Authority: the file, spec or change defining intended behavior.
+2. Constraints: the applicable MUST rules.
+3. Workspace mode: standalone or integration workspace.
+4. Validation: exact commands and acceptance checks.
+5. Target: the specific source or test area to inspect or edit.
+
+Further reading after that point requires a concrete unanswered question.
+
+## DESIGN
+
+- Read first: `AGENTS.md`, project `INDEX.md`, `principles.md`, the relevant OpenSpec capability or change.
+- On demand: `constraints.md`, relevant ADRs, `source-of-truth.md`, targeted source files.
+- Triggers: architectural choice, hard rule, contract change, feasibility ambiguity.
+- Never by default: the whole source tree, unrelated ADR history, sibling project contexts.
+- Writes observable behavior and publishable change material to public OpenSpec, and confidential rationale to private ADRs. Implements no production code unless the role is explicitly changed.
+- Stop when required behavior, constraints, the decision boundary and the proposal are known.
+
+## CODING
+
+- Read first: project `INDEX.md`, `constraints.md`, `tools.md`, the assigned OpenSpec change or, without one, the relevant current spec.
+- On demand: the applicable language standard, a referenced ADR, `source-of-truth.md`, `status.md`.
+- Triggers: code edit, referenced decision, API/schema/config/dependency/generated-artifact change, coordination need.
+- Never by default: unrelated specs, all ADRs, unrelated packages, sibling project contexts.
+- Confirms freshness, then works in a task worktree created from the verified gitlink. Uses the commands and workspace mode in `tools.md`. Runs standalone validation, plus workspace validation when cross-project behavior or dependencies change.
+- Stop when acceptance criteria, constraints, workspace mode, commands and target code are known.
+
+## TESTING
+
+- Read first: project `INDEX.md`, `tools.md`, the relevant OpenSpec requirements and scenarios.
+- On demand: `constraints.md` for architectural invariants, `source-of-truth.md` for API/schema/config/dependency contracts, relevant source and tests.
+- Triggers: invariant verification, external contract, setup or failure explanation.
+- Never by default: unrelated ADRs, private deployment notes, sibling project contexts.
+- Decides whether verification is standalone, workspace or both. Prefers a detached task worktree for independent candidate-SHA verification.
+- Reports separately: uncovered requirements, implementation defects, workspace-only failures, standalone-only failures, specification ambiguity.
+- Stop when each relevant requirement maps to an executable verification.

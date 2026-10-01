@@ -1,0 +1,22 @@
+# Python / uv Workspace Standards
+
+Summary: Architecture-level Python/uv workspace conventions. Load only for Python tasks. Formatters, linters and frameworks belong in each project's own context.
+
+## Two kinds of metadata
+
+| Files | Owner | Role |
+|---|---|---|
+| `<id>/pyproject.toml`, `<id>/uv.lock` | Public project | Standalone dependency authority |
+| `/pyproject.toml`, `/uv.lock` | Private meta-repository | Integration overlay for compatible canonical checkouts |
+
+## MUST
+
+- U-01 The root `pyproject.toml` is a virtual integration workspace (`[tool.uv] package = false`). It is never built or published.
+- U-02 Root workspace members are listed explicitly. Never use a broad `"*"` glob in this polyglot root.
+- U-03 The root workspace keeps `exclude = [".worktrees/**"]`. Task worktrees never become members.
+- U-04 Only projects that can share one compatible resolution become members. Others stay standalone only.
+- U-05 Each public Python project keeps its own `pyproject.toml` and `uv.lock` and works without the private workspace. The root `uv.lock` is an integration lock, not a replacement.
+- U-06 Overrides mapping dependencies to local members (`[tool.uv.sources]`) live only in the root `pyproject.toml`. Public projects declare normal publishable dependencies.
+- U-07 `uv.lock` files are written by `uv`, never by hand.
+- U-08 Standalone validation runs from an excluded task worktree using that project's own `pyproject.toml` and `uv.lock`.
+- U-09 Report integration-workspace-only failures separately from failures reproducible standalone.

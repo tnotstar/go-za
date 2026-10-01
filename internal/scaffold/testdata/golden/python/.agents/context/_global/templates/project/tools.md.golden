@@ -1,0 +1,39 @@
+# Tools and Commands: <project-id>
+
+Summary: Exact supported entry points for agents. Prefer project-owned scripts, Make/Task targets or CI-equivalent commands over reconstructed command lines.
+
+## Project commands
+
+| Action | Invocation | Working directory | Mode | Notes |
+|---|---|---|---|---|
+| Build | `<discover: command>` | active project root | standalone | |
+| Fast tests | `<discover: command>` | active project root | standalone | |
+| Full tests | `<discover: command>` | active project root | standalone | |
+| Integration tests | `<discover: command>` | <discover: meta root or active root> | workspace | |
+| Lint | `<discover: command>` | active project root | standalone | |
+| Generate | `<discover: command>` | active project root | standalone | |
+| OpenSpec validation | `<discover: command>` | active project root | standalone | |
+| Release | `<discover: command>` | canonical/public project | standalone | Human approval: <decide: yes/no> |
+
+## Required capabilities
+
+| Capability | Required | Invocation/adapter |
+|---|---:|---|
+| Git | yes | native |
+| OpenSpec | yes | <discover: CLI / agent skill> |
+| Go | <discover: yes/no> | <discover: version source and invocation> |
+| uv/Python | <discover: yes/no> | <discover: version source and invocation> |
+
+## Workspace contract
+
+- `standalone` means the project must behave as if cloned independently.
+- `workspace` means the private meta-repository integration overlay is intentionally active.
+- Never substitute workspace success for standalone success.
+- For Go, standalone commands in task worktrees set `GOWORK=off`.
+- For uv, standalone validation runs from a task worktree excluded from the root uv workspace, using this project's own `pyproject.toml`/`uv.lock`.
+
+## Rules
+
+- Use the commands above instead of inventing alternate build/test paths.
+- If a documented command is stale, update this file as part of the task.
+- Record secret names only; never secret values.

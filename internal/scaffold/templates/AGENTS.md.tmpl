@@ -49,6 +49,7 @@ _No projects registered._
 
 ## Workspace rules
 
+- `za.toml` is the za workspace manifest and schema marker, maintained by `za`. It is not context and defines no behavior.
 {{if and .Go .Python -}}
 - Root `go.work` and the root uv workspace (`pyproject.toml`) are private integration overlays.
 {{else if .Go -}}

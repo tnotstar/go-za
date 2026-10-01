@@ -184,7 +184,9 @@ func entryNames(dir string) (map[string]bool, error) {
 }
 
 // uvInit creates only a bare pyproject.toml: no Git repository, no inferred
-// author, and no membership in a parent uv workspace.
+// author, and no membership in a parent uv workspace. It never downloads a
+// Python interpreter, which is outside the scope of initialization, and
+// ignores uv configuration files so that only za's arguments shape the result.
 func uvInit(root string) tool.Command {
 	return tool.Command{
 		Name: "uv",
@@ -193,6 +195,8 @@ func uvInit(root string) tool.Command {
 			"--vcs", "none",
 			"--author-from", "none",
 			"--no-workspace",
+			"--no-python-downloads",
+			"--no-config",
 			"--name", projectName(root),
 			root,
 		},

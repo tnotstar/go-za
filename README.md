@@ -77,11 +77,18 @@ them directly, never through a shell:
 ```text
 git init --quiet
 GOWORK=off go work init
-uv init --bare --vcs none --author-from none --no-workspace --name <name> <PATH>
+uv init --bare --vcs none --author-from none --no-workspace \
+        --no-python-downloads --no-config --name <name> <PATH>
 ```
 
 `<name>` is the directory name normalized to a valid Python project name. For
 example, `My Workspace` becomes `my-workspace`.
+
+`za init --python` never downloads Python. If uv finds no suitable local
+interpreter, initialization fails with uv's error. Install Python yourself
+first. `--no-config` stops uv from reading `uv.toml` or other uv configuration
+files, so user- and machine-level uv settings cannot change what gets
+generated. `UV_*` environment variables still apply.
 
 After `uv init`, `za` appends the tables that turn the root into a private,
 non-package integration workspace:
@@ -94,6 +101,10 @@ package = false
 members = []
 exclude = [".worktrees/**"]
 ```
+
+`za` keeps any other `[tool.*]` tables that uv generates. If uv's output
+already defines anything under `tool.uv`, `za` refuses to overwrite it and
+rolls back.
 
 ### Exit status
 
@@ -112,6 +123,7 @@ create; it reports them and leaves them in place.
 ```text
 <workspace>/
 ├── .git/                    git init
+├── za.toml                  za workspace manifest
 ├── .gitignore               ignores .worktrees/, .agents/runtime/, .venv/
 ├── .gitattributes           LF line endings
 ├── .editorconfig
@@ -139,6 +151,30 @@ the languages you select.
 > context stays private because it lives in the private meta-repository,
 > outside every public project's Git working tree. The workspace stays
 > correct even if the ignore rules are removed.
+
+### Workspace manifest
+
+Every initialized workspace has a `za.toml` at its root. `za` writes it, and it
+is tracked in the meta-repository:
+
+```toml
+schema = 1
+
+[workspace]
+go = true
+python = false
+```
+
+| Key | Meaning |
+|---|---|
+| `schema` | Version of the workspace layout. It is independent of the `za` release version. |
+| `workspace.go` | The workspace was initialized with `--go` |
+| `workspace.python` | The workspace was initialized with `--python` |
+
+The manifest belongs to `za`, not to the agent context under `.agents/`. It
+only marks the directory as a `za` workspace. Projects, paths and tool
+versions are deliberately left out, because they have their own sources of
+truth.
 
 In `AGENTS.md`, the region between `<!-- za:projects:start -->` and
 `<!-- za:projects:end -->` is reserved for future `za` commands. Keep your own

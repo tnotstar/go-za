@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -200,8 +201,36 @@ func TestTopLevel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{".agents", ".editorconfig", ".gitattributes", ".gitignore", ".worktrees", "AGENTS.md", "CLAUDE.md"}
+	want := []string{".agents", ".editorconfig", ".gitattributes", ".gitignore", ".worktrees", "AGENTS.md", "CLAUDE.md", "za.toml"}
 	if got := s.TopLevel(); !slices.Equal(got, want) {
 		t.Errorf("TopLevel() = %v, want %v", got, want)
+	}
+}
+
+func TestManifest(t *testing.T) {
+	want := map[string]string{
+		"go":       "schema = 1\n\n[workspace]\ngo = true\npython = false\n",
+		"python":   "schema = 1\n\n[workspace]\ngo = false\npython = true\n",
+		"polyglot": "schema = 1\n\n[workspace]\ngo = true\npython = true\n",
+	}
+	for _, m := range modes {
+		s, err := Render(m.opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var manifests []string
+		for _, f := range s.Files {
+			if path.Base(f.Path) != "za.toml" {
+				continue
+			}
+			manifests = append(manifests, f.Path)
+			if got := string(f.Content); got != want[m.name] {
+				t.Errorf("%s: za.toml =\n%s\nwant\n%s", m.name, got, want[m.name])
+			}
+		}
+		// Exactly one manifest, at the workspace root and never under .agents/.
+		if !slices.Equal(manifests, []string{"za.toml"}) {
+			t.Errorf("%s: manifests rendered at %v, want only za.toml", m.name, manifests)
+		}
 	}
 }

@@ -4,6 +4,9 @@
 // Every file under templates/ carries a ".tmpl" suffix, which is removed in
 // the output. The suffix keeps files such as AGENTS.md, CLAUDE.md and
 // .gitignore inert inside this repository.
+//
+// The rendered za.toml is the workspace manifest. Its "schema" key is the
+// version of the workspace layout, independent of the za release version.
 package scaffold
 
 import (

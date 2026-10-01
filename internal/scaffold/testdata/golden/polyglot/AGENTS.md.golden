@@ -45,6 +45,7 @@ _No projects registered._
 
 ## Workspace rules
 
+- `za.toml` is the za workspace manifest and schema marker, maintained by `za`. It is not context and defines no behavior.
 - Root `go.work` and the root uv workspace (`pyproject.toml`) are private integration overlays.
 - Root workspaces reference canonical submodule checkouts only and never replace a project's own dependency metadata.
 - Task worktrees are never permanent members of root language workspaces.

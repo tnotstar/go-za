@@ -3,6 +3,7 @@ package initcmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -47,6 +48,7 @@ var commonPaths = []string{
 	".editorconfig",
 	"AGENTS.md",
 	"CLAUDE.md",
+	"za.toml",
 	".agents/context/_global/policy.md",
 	".agents/context/_global/principles.md",
 	".agents/context/_global/tooling.md",
@@ -117,7 +119,7 @@ func TestRunModes(t *testing.T) {
 					t.Errorf("unexpected %s", p)
 				}
 			}
-			for _, p := range []string{"go.work.sum", "uv.lock", ".gitmodules", "openspec", ".agents/bin", ".agents/runtime/.gitkeep", ".worktrees/.gitkeep"} {
+			for _, p := range []string{"go.work.sum", "uv.lock", ".gitmodules", "openspec", ".agents/bin", ".agents/runtime/.gitkeep", ".worktrees/.gitkeep", ".agents/za.toml"} {
 				if exists(t, filepath.Join(root, filepath.FromSlash(p))) {
 					t.Errorf("za must not create %s", p)
 				}
@@ -125,7 +127,51 @@ func TestRunModes(t *testing.T) {
 			if got := entries(t, filepath.Join(root, ".agents/context/projects")); !slices.Equal(got, []string{".gitkeep"}) {
 				t.Errorf(".agents/context/projects contains %v, want only .gitkeep", got)
 			}
+			manifest, err := os.ReadFile(filepath.Join(root, "za.toml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := fmt.Sprintf("schema = 1\n\n[workspace]\ngo = %t\npython = %t\n", tt.opts.Go, tt.opts.Python)
+			if string(manifest) != want {
+				t.Errorf("za.toml =\n%s\nwant\n%s", manifest, want)
+			}
 		})
+	}
+}
+
+// TestUVInitHardening guards the flags that keep uv init free of hidden
+// environmental effects; dropping any of them must fail loudly.
+func TestUVInitHardening(t *testing.T) {
+	args := uvInit("/ws").Args
+	for flag, why := range map[string]string{
+		"--no-workspace":        "a parent uv workspace would capture the new root",
+		"--no-python-downloads": "za init must never install a Python interpreter",
+		"--no-config":           "user or system uv.toml would shape the generated files",
+	} {
+		if !slices.Contains(args, flag) {
+			t.Errorf("uv init lacks %s: %s", flag, why)
+		}
+	}
+}
+
+func TestRunPreservesUnrelatedToolTables(t *testing.T) {
+	root := t.TempDir()
+	generated := tooltest.UVPyproject + "\n[tool.example]\nenabled = true\n"
+	f := &tooltest.Fake{Effect: func(c tool.Command) error {
+		if c.Name == "uv" {
+			return os.WriteFile(filepath.Join(c.Dir, "pyproject.toml"), []byte(generated), 0o644)
+		}
+		return tooltest.Native(c)
+	}}
+	if _, err := Run(t.Context(), Options{Python: true, Path: root}, fakeEnv(f)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(data); got != generated+integrationTables {
+		t.Errorf("pyproject.toml =\n%s\nwant\n%s", got, generated+integrationTables)
 	}
 }
 
@@ -141,6 +187,7 @@ func TestRunNativeInvocations(t *testing.T) {
 		{Name: "go", Args: []string{"work", "init"}, Dir: root, Env: []string{"GOWORK=off"}},
 		{Name: "uv", Args: []string{
 			"init", "--bare", "--vcs", "none", "--author-from", "none", "--no-workspace",
+			"--no-python-downloads", "--no-config",
 			"--name", "my-workspace", root,
 		}, Dir: root},
 	}
@@ -237,6 +284,14 @@ func TestRunTargetValidation(t *testing.T) {
 			name: "hidden file makes target non-empty",
 			setup: func(t *testing.T, dir string) string {
 				writeFile(t, filepath.Join(dir, ".DS_Store"))
+				return dir
+			},
+			want: "target directory is not empty",
+		},
+		{
+			name: "existing za.toml is rejected, not overwritten",
+			setup: func(t *testing.T, dir string) string {
+				writeFile(t, filepath.Join(dir, "za.toml"))
 				return dir
 			},
 			want: "target directory is not empty",
@@ -422,7 +477,7 @@ func TestRunCleanupOnNativeFailure(t *testing.T) {
 			return tooltest.Native(c)
 		}}
 		_, err := Run(t.Context(), Options{Python: true, Path: target}, fakeEnv(f))
-		if err == nil || !strings.Contains(err.Error(), "refusing to edit") {
+		if err == nil || !strings.Contains(err.Error(), "defines [tool.uv]") {
 			t.Fatalf("error = %v, want pyproject rejection", err)
 		}
 		if exists(t, target) {
@@ -442,6 +497,25 @@ func TestRunCleanupOnNativeFailure(t *testing.T) {
 		_, err := Run(t.Context(), Options{Go: true, Path: target}, fakeEnv(f))
 		if err == nil || !strings.Contains(err.Error(), "AGENTS.md") {
 			t.Fatalf("error = %v, want AGENTS.md write failure", err)
+		}
+		if got := entries(t, target); len(got) != 0 {
+			t.Errorf("target contains %v after cleanup, want empty", got)
+		}
+	})
+
+	t.Run("failure after the manifest is written removes it", func(t *testing.T) {
+		target := t.TempDir()
+		f := &tooltest.Fake{Effect: func(c tool.Command) error {
+			if err := tooltest.Native(c); err != nil {
+				return err
+			}
+			// Scaffold directories are created after every file, so the
+			// mkdir of .worktrees fails once za.toml already exists.
+			return os.WriteFile(filepath.Join(c.Dir, ".worktrees"), nil, 0o644)
+		}}
+		_, err := Run(t.Context(), Options{Go: true, Path: target}, fakeEnv(f))
+		if err == nil || !strings.Contains(err.Error(), "create directory .worktrees") {
+			t.Fatalf("error = %v, want .worktrees creation failure", err)
 		}
 		if got := entries(t, target); len(got) != 0 {
 			t.Errorf("target contains %v after cleanup, want empty", got)

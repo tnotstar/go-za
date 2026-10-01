@@ -1,6 +1,7 @@
 package initcmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,6 +50,13 @@ func TestRealTools(t *testing.T) {
 			if err != nil {
 				t.Errorf("ignore rules not effective: %v %s", err, out)
 			}
+			if out, err := exec.Command("git", "-C", root, "check-ignore", "za.toml").CombinedOutput(); err == nil {
+				t.Errorf("za.toml is ignored but must be tracked: %s", out)
+			}
+			manifest, err := os.ReadFile(filepath.Join(root, "za.toml"))
+			if want := fmt.Sprintf("schema = 1\n\n[workspace]\ngo = %t\npython = %t\n", tt.opts.Go, tt.opts.Python); err != nil || string(manifest) != want {
+				t.Errorf("za.toml = %q (%v), want %q", manifest, err, want)
+			}
 
 			if tt.opts.Go {
 				data, err := os.ReadFile(filepath.Join(root, "go.work"))
@@ -71,6 +79,13 @@ func TestRealTools(t *testing.T) {
 					if _, err := os.Stat(filepath.Join(root, unwanted)); err == nil {
 						t.Errorf("uv created unexpected %s", unwanted)
 					}
+				}
+				// The installed uv must accept the augmented workspace, without
+				// writing a lock file or fetching anything.
+				lock := exec.Command("uv", "lock", "--dry-run", "--no-config", "--no-python-downloads")
+				lock.Dir = root
+				if out, err := lock.CombinedOutput(); err != nil {
+					t.Errorf("uv rejects the generated workspace: %v\n%s", err, out)
 				}
 			}
 		})

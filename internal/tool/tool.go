@@ -31,6 +31,9 @@ func (c Command) String() string {
 type Runner interface {
 	LookPath(name string) (string, error)
 	Run(ctx context.Context, cmd Command) error
+	// Output runs cmd like Run but returns its standard output. Standard
+	// error is included in the returned error when the command fails.
+	Output(ctx context.Context, cmd Command) ([]byte, error)
 }
 
 // Exec is the Runner backed by os/exec.
@@ -44,6 +47,22 @@ func (Exec) LookPath(name string) (string, error) {
 // Run executes cmd and waits for it. The combined output is captured and
 // included in the returned error when the command fails.
 func (Exec) Run(ctx context.Context, c Command) error {
+	var out bytes.Buffer
+	return run(ctx, c, &out, &out)
+}
+
+// Output executes cmd and returns its standard output.
+func (Exec) Output(ctx context.Context, c Command) ([]byte, error) {
+	var stdout, stderr bytes.Buffer
+	if err := run(ctx, c, &stdout, &stderr); err != nil {
+		return nil, err
+	}
+	return stdout.Bytes(), nil
+}
+
+// run executes c with the given output buffers. The content of diag is
+// included in the returned error when the command fails.
+func run(ctx context.Context, c Command, stdout, diag *bytes.Buffer) error {
 	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
 	cmd.Dir = c.Dir
 	// Bound the wait for output pipes held open by grandchildren after the
@@ -53,12 +72,11 @@ func (Exec) Run(ctx context.Context, c Command) error {
 		// os/exec keeps the last value of duplicated keys, so overrides win.
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
+	cmd.Stdout = stdout
+	cmd.Stderr = diag
 
 	if err := cmd.Run(); err != nil {
-		if msg := strings.TrimSpace(out.String()); msg != "" {
+		if msg := strings.TrimSpace(diag.String()); msg != "" {
 			return fmt.Errorf("%s: %w\n%s", c, err, msg)
 		}
 		return fmt.Errorf("%s: %w", c, err)

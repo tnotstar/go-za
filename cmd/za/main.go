@@ -6,9 +6,9 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/tnotstar/go-za/internal/cli"
-	"github.com/tnotstar/go-za/internal/initcmd"
 	"github.com/tnotstar/go-za/internal/tool"
 )
 
@@ -20,9 +20,10 @@ func main() {
 		<-ctx.Done()
 		stop()
 	}()
-	code := cli.Run(ctx, os.Args[1:], os.Stdout, os.Stderr, initcmd.Env{
+	code := cli.Run(ctx, os.Args[1:], os.Stdout, os.Stderr, cli.Env{
 		Runner: tool.Exec{},
 		Getwd:  os.Getwd,
+		Now:    time.Now,
 	})
 	stop()
 	os.Exit(code)

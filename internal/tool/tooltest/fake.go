@@ -18,7 +18,10 @@ type Fake struct {
 	// Effect, when non-nil, runs for every command and may simulate side
 	// effects or failures. A nil Effect makes every command succeed silently.
 	Effect func(tool.Command) error
-	// Calls records every command passed to Run, in order.
+	// Respond, when non-nil, answers every command passed to Output. A nil
+	// Respond makes Output behave like Run with empty standard output.
+	Respond func(tool.Command) ([]byte, error)
+	// Calls records every command passed to Run or Output, in order.
 	Calls []tool.Command
 }
 
@@ -37,6 +40,15 @@ func (f *Fake) Run(_ context.Context, c tool.Command) error {
 		return f.Effect(c)
 	}
 	return nil
+}
+
+// Output implements tool.Runner.
+func (f *Fake) Output(ctx context.Context, c tool.Command) ([]byte, error) {
+	if f.Respond == nil {
+		return nil, f.Run(ctx, c)
+	}
+	f.Calls = append(f.Calls, c)
+	return f.Respond(c)
 }
 
 // UVPyproject is the pyproject.toml content Native writes for uv init.

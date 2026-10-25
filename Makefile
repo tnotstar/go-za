@@ -49,6 +49,7 @@ race:
 integration: export ZA_INTEGRATION = 1
 integration:
 	$(GO) test -count=1 -run TestRealTools -v ./internal/initcmd
+	$(GO) test -count=1 -run TestAddRealGit -v ./internal/project
 
 .PHONY: cover
 cover:
@@ -59,6 +60,8 @@ cover:
 golden:
 	$(GO) test ./internal/scaffold -update
 	$(GO) test ./internal/scaffold
+	$(GO) test ./internal/project -run TestAddRealGitSuccess -update
+	$(GO) test ./internal/project
 
 .PHONY: fmt
 fmt:

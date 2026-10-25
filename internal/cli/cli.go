@@ -7,8 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/tnotstar/go-za/internal/initcmd"
+	"github.com/tnotstar/go-za/internal/project"
+	"github.com/tnotstar/go-za/internal/tool"
 )
 
 // Exit codes returned by Run.
@@ -24,14 +27,22 @@ Usage:
   za <command> [arguments]
 
 Commands:
-  init    Initialize an empty directory as a za meta-workspace
+  init     Initialize an empty directory as a za meta-workspace
+  project  Manage the projects of a za workspace
 
 Run "za <command> --help" for details about a command.
 `
 
+// Env holds the process-level dependencies of every subcommand.
+type Env struct {
+	Runner tool.Runner
+	Getwd  func() (string, error)
+	Now    func() time.Time
+}
+
 // Run executes the za command line args (without the program name) and
 // returns the process exit code.
-func Run(ctx context.Context, args []string, stdout, stderr io.Writer, env initcmd.Env) int {
+func Run(ctx context.Context, args []string, stdout, stderr io.Writer, env Env) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, usage)
 		return ExitUsage
@@ -42,7 +53,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, env initc
 		fmt.Fprint(stdout, usage)
 		return ExitOK
 	case "init":
-		return runInit(ctx, args[1:], stdout, stderr, env)
+		return runInit(ctx, args[1:], stdout, stderr, initcmd.Env{Runner: env.Runner, Getwd: env.Getwd})
+	case "project":
+		return runProject(ctx, args[1:], stdout, stderr, project.Env{Runner: env.Runner, Getwd: env.Getwd, Now: env.Now})
 	default:
 		fmt.Fprintf(stderr, "error: unknown command %q\nRun \"za --help\" for usage.\n", args[0])
 		return ExitUsage
@@ -61,6 +74,43 @@ func runInit(ctx context.Context, args []string, stdout, stderr io.Writer, env i
 	}
 
 	res, err := initcmd.Run(ctx, opts, env)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return ExitFailure
+	}
+	fmt.Fprint(stdout, res.Summary())
+	return ExitOK
+}
+
+func runProject(ctx context.Context, args []string, stdout, stderr io.Writer, env project.Env) int {
+	if len(args) == 0 {
+		fmt.Fprint(stderr, project.Usage)
+		return ExitUsage
+	}
+	switch args[0] {
+	case "-h", "-help", "--help", "help":
+		fmt.Fprint(stdout, project.Usage)
+		return ExitOK
+	case "add":
+		return runProjectAdd(ctx, args[1:], stdout, stderr, env)
+	default:
+		fmt.Fprintf(stderr, "error: unknown project command %q\nRun \"za project --help\" for usage.\n", args[0])
+		return ExitUsage
+	}
+}
+
+func runProjectAdd(ctx context.Context, args []string, stdout, stderr io.Writer, env project.Env) int {
+	url, err := project.ParseAddArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, project.AddUsage)
+		return ExitOK
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\nRun \"za project add --help\" for usage.\n", err)
+		return ExitUsage
+	}
+
+	res, err := project.Add(ctx, url, env)
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return ExitFailure

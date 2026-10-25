@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tnotstar/go-za/internal/initcmd"
 	"github.com/tnotstar/go-za/internal/tool/tooltest"
 )
 
@@ -17,6 +16,8 @@ func TestRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	outside := t.TempDir()
+
 	tests := []struct {
 		name       string
 		args       []string
@@ -25,6 +26,7 @@ func TestRun(t *testing.T) {
 		stderr     string
 		noCommands bool
 		missing    string
+		getwd      string
 	}{
 		{name: "init missing uv", args: []string{"init", "--python", filepath.Join(t.TempDir(), "x")}, missing: "uv", code: ExitFailure, stderr: `error: Python workspace requested but executable "uv" was not found in PATH`, noCommands: true},
 		{name: "no command", args: nil, code: ExitUsage, stderr: "Usage:"},
@@ -38,13 +40,26 @@ func TestRun(t *testing.T) {
 		{name: "init non-empty target", args: []string{"init", "--go", nonEmpty}, code: ExitFailure, stderr: "error: target directory is not empty: " + nonEmpty, noCommands: true},
 		{name: "init go", args: []string{"init", "--go", filepath.Join(t.TempDir(), "go")}, code: ExitOK, stdout: "  Go:     enabled\n  Python: disabled"},
 		{name: "init python", args: []string{"init", "--python", filepath.Join(t.TempDir(), "py")}, code: ExitOK, stdout: "  Go:     disabled\n  Python: enabled"},
+		{name: "help lists project", args: []string{"--help"}, code: ExitOK, stdout: "project  Manage the projects"},
+		{name: "project without command", args: []string{"project"}, code: ExitUsage, stderr: "za project <command>", noCommands: true},
+		{name: "project help", args: []string{"project", "--help"}, code: ExitOK, stdout: "add     Add a public Go repository"},
+		{name: "project unknown command", args: []string{"project", "list"}, code: ExitUsage, stderr: `unknown project command "list"`, noCommands: true},
+		{name: "project add help", args: []string{"project", "add", "--help"}, code: ExitOK, stdout: "za project add <repo-url>"},
+		{name: "project add without url", args: []string{"project", "add"}, code: ExitUsage, stderr: "error: missing repository URL", noCommands: true},
+		{name: "project add two urls", args: []string{"project", "add", "https://h/o/a.git", "https://h/o/b.git"}, code: ExitUsage, stderr: "too many arguments", noCommands: true},
+		{name: "project add unknown option", args: []string{"project", "add", "--force", "https://h/o/a.git"}, code: ExitUsage, stderr: "flag provided but not defined: -force", noCommands: true},
+		{name: "project add empty url", args: []string{"project", "add", ""}, code: ExitUsage, stderr: "must not be empty", noCommands: true},
+		{name: "project add outside workspace", args: []string{"project", "add", "https://h/o/a.git"}, getwd: outside, code: ExitFailure, stderr: "error: not inside a za workspace", noCommands: true},
 		{name: "init polyglot", args: []string{"init", "--go", "--python", filepath.Join(t.TempDir(), "both")}, code: ExitOK, stdout: "  Go:     enabled\n  Python: enabled"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			f := &tooltest.Fake{Missing: map[string]bool{tt.missing: true}, Effect: tooltest.Native}
-			env := initcmd.Env{Runner: f, Getwd: os.Getwd}
+			env := Env{Runner: f, Getwd: os.Getwd}
+			if tt.getwd != "" {
+				env.Getwd = func() (string, error) { return tt.getwd, nil }
+			}
 
 			code := Run(t.Context(), tt.args, &stdout, &stderr, env)
 			if code != tt.code {

@@ -50,3 +50,21 @@ func TestCommandString(t *testing.T) {
 		t.Errorf("String() = %q", got)
 	}
 }
+
+func TestExecOutputSeparatesStreams(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go not in PATH")
+	}
+	out, err := Exec{}.Output(t.Context(), Command{Name: "go", Args: []string{"env", "GOWORK"}, Dir: t.TempDir(), Env: []string{"GOWORK=off"}})
+	if err != nil {
+		t.Fatalf("Output: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "off" {
+		t.Errorf("stdout = %q, want %q", got, "off")
+	}
+
+	_, err = Exec{}.Output(t.Context(), Command{Name: "go", Args: []string{"no-such-subcommand"}, Dir: t.TempDir()})
+	if err == nil || !strings.Contains(err.Error(), "no-such-subcommand") {
+		t.Errorf("error lacks diagnostics: %v", err)
+	}
+}

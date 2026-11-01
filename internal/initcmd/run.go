@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,12 +25,24 @@ type Result struct {
 	Path   string
 	Go     bool
 	Python bool
+	Rust   bool
+	// CargoLock reports whether the metadata validation left a root
+	// Cargo.lock, which is then versioned instead of ignored.
+	CargoLock bool
 }
 
 // Summary renders the script-friendly success report.
 func (r Result) Summary() string {
-	return fmt.Sprintf("Initialized za workspace at %s\n  Git:    enabled\n  Go:     %s\n  Python: %s\n",
-		r.Path, enabled(r.Go), enabled(r.Python))
+	s := fmt.Sprintf("Initialized za workspace at %s\n  Git:    enabled\n  Go:     %s\n  Python: %s\n  Rust:   %s\n",
+		r.Path, enabled(r.Go), enabled(r.Python), enabled(r.Rust))
+	if r.Rust {
+		lock := "none (empty bootstrap state)"
+		if r.CargoLock {
+			lock = "versioned (created by Cargo)"
+		}
+		s += "  Cargo lock: " + lock + "\n"
+	}
+	return s
 }
 
 func enabled(on bool) string {
@@ -43,8 +56,8 @@ func enabled(on bool) string {
 // mutation; if initialization fails afterwards, Run restores the target on a
 // best-effort basis without touching entries it did not create.
 func Run(ctx context.Context, opts Options, env Env) (Result, error) {
-	if !opts.Go && !opts.Python {
-		return Result{}, &UsageError{"at least one workspace type is required: --go and/or --python"}
+	if !opts.Go && !opts.Python && !opts.Rust {
+		return Result{}, &UsageError{"at least one workspace type is required: --go, --python and/or --rust"}
 	}
 
 	path := opts.Path
@@ -59,10 +72,11 @@ func Run(ctx context.Context, opts Options, env Env) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := preflight(env.Runner, opts); err != nil {
+	cargoPin, err := preflight(ctx, env.Runner, opts)
+	if err != nil {
 		return Result{}, err
 	}
-	files, err := scaffold.Render(scaffold.Options{Go: opts.Go, Python: opts.Python})
+	files, err := scaffold.Render(scaffold.Options{Go: opts.Go, Python: opts.Python, Rust: opts.Rust})
 	if err != nil {
 		return Result{}, err
 	}
@@ -70,18 +84,25 @@ func Run(ctx context.Context, opts Options, env Env) (Result, error) {
 	if err := target.Create(); err != nil {
 		return Result{}, err
 	}
-	in := initializer{ctx: ctx, runner: env.Runner, root: target.Path}
+	in := initializer{ctx: ctx, runner: env.Runner, root: target.Path, cargoPin: cargoPin}
 	if err := in.run(opts, files); err != nil {
 		if cerr := target.Cleanup(in.created); cerr != nil {
 			return Result{}, fmt.Errorf("%w\nwarning: cleanup incomplete: %v", err, cerr)
 		}
 		return Result{}, err
 	}
-	return Result{Path: target.Path, Go: opts.Go, Python: opts.Python}, nil
+	res := Result{Path: target.Path, Go: opts.Go, Python: opts.Python, Rust: opts.Rust}
+	if opts.Rust {
+		if res.CargoLock, err = fileExists(filepath.Join(target.Path, "Cargo.lock")); err != nil {
+			return Result{}, err
+		}
+	}
+	return res, nil
 }
 
-// preflight verifies every required executable before any mutation.
-func preflight(r tool.Runner, opts Options) error {
+// preflight verifies every required executable before any mutation. For
+// --rust it also resolves the toolchain pin and enforces the version floor.
+func preflight(ctx context.Context, r tool.Runner, opts Options) (string, error) {
 	required := []struct {
 		name, purpose string
 		needed        bool
@@ -99,13 +120,20 @@ func preflight(r tool.Runner, opts Options) error {
 			errs = append(errs, fmt.Errorf("%s but executable %q was not found in PATH", req.purpose, req.name))
 		}
 	}
-	return errors.Join(errs...)
+	if err := errors.Join(errs...); err != nil {
+		return "", err
+	}
+	if !opts.Rust {
+		return "", nil
+	}
+	return rustPreflight(ctx, r)
 }
 
 type initializer struct {
-	ctx    context.Context
-	runner tool.Runner
-	root   string
+	ctx      context.Context
+	runner   tool.Runner
+	root     string
+	cargoPin string // RUSTUP_TOOLCHAIN pin for Cargo invocations; empty when unmanaged
 	// created lists the top-level entries that appeared in the target while
 	// a step of this run executed; only these are removed on failure.
 	created []string
@@ -138,7 +166,43 @@ func (in *initializer) run(opts Options, files scaffold.Scaffold) error {
 		}
 	}
 
-	return in.step(func() error { return files.Write(in.root) })
+	if err := in.step(func() error { return files.Write(in.root) }); err != nil {
+		return err
+	}
+
+	if opts.Rust {
+		return in.step(func() error {
+			manifest, err := manifestBytes(files)
+			if err != nil {
+				return err
+			}
+			if err := in.cargoValidate(in.cargoPin, manifest); err != nil {
+				return fmt.Errorf("Rust workspace validation failed: %w", err)
+			}
+			return nil
+		})
+	}
+	return nil
+}
+
+// manifestBytes returns the rendered root Cargo.toml of the scaffold, which
+// the validation step compares against the file on disk.
+func manifestBytes(files scaffold.Scaffold) ([]byte, error) {
+	for _, f := range files.Files {
+		if f.Path == "Cargo.toml" {
+			return f.Content, nil
+		}
+	}
+	return nil, errors.New("scaffold lacks Cargo.toml although Rust was selected")
+}
+
+// fileExists reports whether p exists, without following a final symlink.
+func fileExists(p string) (bool, error) {
+	_, err := os.Lstat(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // native runs a native initializer as one step.

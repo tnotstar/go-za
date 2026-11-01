@@ -5,8 +5,8 @@ Summary: <decide: one sentence describing this project's responsibility>
 - Canonical checkout: `<project-id>/`
 - Private context: `.agents/context/<project-id>/`
 - Task worktrees: `.worktrees/<project-id>/<task-id>/`
-- Language/runtime: <discover: go | python-uv | mixed | other>
-- Canonical workspace participation: <decide: go | uv | both | none>
+- Language/runtime: <discover: go | python-uv | rust | mixed | other>
+- Canonical workspace participation: <decide: go | uv | cargo | mixed | none>
 - Requirement authority: <discover: behavior authority>
 - Tracking branch: read `submodule.<project-id>.branch` from `.gitmodules`
 

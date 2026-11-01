@@ -3,3 +3,4 @@ schema = 3
 [workspace]
 go = true
 python = true
+rust = false

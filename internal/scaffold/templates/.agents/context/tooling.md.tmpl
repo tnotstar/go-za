@@ -22,6 +22,9 @@ Native tools are used directly; their behavior is never emulated by hand.
 {{- if .Python}}
 | `uv` | Python project manager. Owns workspace resolution and every `uv.lock`. |
 {{- end}}
+{{- if .Rust}}
+| `cargo`/`rustc` | Rust toolchain. Owns the root virtual `Cargo.toml` and, when Cargo creates one, the root `Cargo.lock`. Never install toolchains or components. |
+{{- end}}
 
 ## Conventions
 
@@ -33,6 +36,9 @@ Native tools are used directly; their behavior is never emulated by hand.
 {{- end}}
 {{- if .Python}}
 - uv standalone validation runs from an excluded task worktree with the project's own `pyproject.toml` and `uv.lock`; see `python-standards.md`.
+{{- end}}
+{{- if .Rust}}
+- Rust standalone validation resolves the effective workspace root and members with `cargo metadata`; `--manifest-path` alone is not isolation; see `rust-standards.md`.
 {{- end}}
 - Capabilities a project requires (an OpenSpec CLI when OpenSpec is adopted, agent skills, plugins) are listed in its `tools.md`.
 

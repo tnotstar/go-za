@@ -9,7 +9,7 @@ import (
 
 // Usage is the help text for "za init".
 const Usage = `Usage:
-  za init [--go] [--python] [PATH]
+  za init [--go] [--python] [--rust] [PATH]
 
 Initialize PATH as a private za meta-workspace. PATH defaults to the current
 directory. It must be an empty directory (hidden entries count) or must not
@@ -18,14 +18,19 @@ exist yet; missing directories are created.
 At least one workspace type is required:
   --go       initialize a Go workspace with "go work init"
   --python   initialize a uv integration workspace with "uv init"
+  --rust     initialize a root Cargo workspace scaffold (virtual manifest,
+             no members)
 
-Required executables: git always; go with --go; uv with --python.
+Required executables: git always; go with --go; uv with --python; cargo and
+rustc (version 1.85.0 or newer) with --rust. za never installs or downloads
+toolchains.
 `
 
 // Options are the parsed "za init" arguments.
 type Options struct {
 	Go     bool
 	Python bool
+	Rust   bool
 	// Path is the target directory; empty means the current directory.
 	Path string
 }
@@ -46,6 +51,7 @@ func ParseArgs(args []string) (Options, error) {
 	fs.SetOutput(io.Discard)
 	fs.BoolVar(&opts.Go, "go", false, "")
 	fs.BoolVar(&opts.Python, "python", false, "")
+	fs.BoolVar(&opts.Rust, "rust", false, "")
 
 	var positional []string
 	for {
@@ -72,8 +78,8 @@ func ParseArgs(args []string) (Options, error) {
 		return Options{}, &UsageError{"too many arguments: expected at most one PATH"}
 	case len(positional) == 1 && positional[0] == "":
 		return Options{}, &UsageError{"PATH must not be empty"}
-	case !opts.Go && !opts.Python:
-		return Options{}, &UsageError{"at least one workspace type is required: --go and/or --python"}
+	case !opts.Go && !opts.Python && !opts.Rust:
+		return Options{}, &UsageError{"at least one workspace type is required: --go, --python and/or --rust"}
 	}
 	if len(positional) == 1 {
 		opts.Path = positional[0]

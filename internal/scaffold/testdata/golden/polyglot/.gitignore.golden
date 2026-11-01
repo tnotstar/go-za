@@ -7,3 +7,4 @@
 
 # Root uv environment, when Python integration is enabled.
 /.venv/
+

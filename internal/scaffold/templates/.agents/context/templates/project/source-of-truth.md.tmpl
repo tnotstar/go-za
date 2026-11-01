@@ -11,8 +11,10 @@ Summary: The scoped authority map for this project. Each subject has exactly one
 | Configuration keys/defaults | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
 | Go dependencies | <project-id> repository | `<project-id>/go.mod` | <discover: `<project-id>/go.sum` or not applicable> |
 | Python dependencies | <discover: `<project-id>` repository or not applicable> | <discover: `<project-id>/pyproject.toml` or not applicable> | <discover: `<project-id>/uv.lock` or not applicable> |
+| Cargo dependencies | <discover: `<project-id>` repository or not applicable> | <discover: `<project-id>/Cargo.toml` or not applicable> | <discover: `<project-id>/Cargo.lock` or not applicable> |
 | Go integration overlay | private meta-repository | <discover: `/go.work` or not applicable> | <discover: revision or date> |
 | Python integration overlay | private meta-repository | <discover: `/pyproject.toml` + `/uv.lock` or not applicable> | <discover: revision or date> |
+| Cargo integration overlay | private meta-repository | <discover: `/Cargo.toml` or not applicable> | <discover: revision or date> |
 | Build/release implementation | <project-id> repository | <discover: Makefile/script/CI path> | <discover: revision or date> |
 | Technical decisions | this project's private context | `.agents/context/<project-id>/decisions/` | accepted ADRs |
 | Execution status | this project's private context | `.agents/context/<project-id>/status.md` | informational only |

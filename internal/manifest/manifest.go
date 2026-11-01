@@ -40,6 +40,7 @@ type Manifest struct {
 type Workspace struct {
 	Go     bool
 	Python bool
+	Rust   bool
 }
 
 // Find returns the directory of the nearest za.toml at or above start. It
@@ -83,7 +84,10 @@ func Load(root string) (Manifest, error) {
 	return m, nil
 }
 
-// Parse parses a schema 3 manifest.
+// Parse parses a schema 3 manifest. Newly generated manifests record all
+// three capability booleans; reading an otherwise valid manifest without
+// workspace.rust means Rust is disabled, which keeps manifests written by
+// earlier schema-3 writers readable.
 func Parse(data []byte) (Manifest, error) {
 	m, seen, err := parseLines(data)
 	if err != nil {
@@ -159,6 +163,8 @@ func parseLines(data []byte) (Manifest, map[string]bool, error) {
 			m.Workspace.Go, err = parseBool(raw)
 		case "workspace.python":
 			m.Workspace.Python, err = parseBool(raw)
+		case "workspace.rust":
+			m.Workspace.Rust, err = parseBool(raw)
 		default:
 			return fail("unknown key %s", key)
 		}

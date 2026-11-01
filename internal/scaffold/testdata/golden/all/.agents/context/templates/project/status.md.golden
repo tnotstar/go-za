@@ -1,0 +1,18 @@
+# Project Status: <project-id>
+
+- Phase: <decide: bootstrap | active-development | maintenance>
+- Pin observed: YYYY-MM-DD
+- Pinned gitlink: `<full-submodule-SHA>`
+- Context verified: pending (registration observed the pin; no review has confirmed it)
+
+## In progress
+
+- none
+
+## Known issues
+
+- none
+
+## Next steps
+
+- <decide: at most three concrete items>

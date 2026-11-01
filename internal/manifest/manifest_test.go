@@ -15,8 +15,10 @@ func TestParse(t *testing.T) {
 		want Manifest
 		err  string
 	}{
-		{name: "generated go", in: "schema = 3\n\n[workspace]\ngo = true\npython = false\n", want: Manifest{3, Workspace{Go: true}}},
-		{name: "generated polyglot", in: "schema = 3\n\n[workspace]\ngo = true\npython = true\n", want: Manifest{3, Workspace{Go: true, Python: true}}},
+		{name: "generated go", in: "schema = 3\n\n[workspace]\ngo = true\npython = false\nrust = false\n", want: Manifest{3, Workspace{Go: true}}},
+		{name: "generated rust-only", in: "schema = 3\n\n[workspace]\ngo = false\npython = false\nrust = true\n", want: Manifest{3, Workspace{Rust: true}}},
+		{name: "generated polyglot", in: "schema = 3\n\n[workspace]\ngo = true\npython = true\nrust = true\n", want: Manifest{3, Workspace{Go: true, Python: true, Rust: true}}},
+		{name: "missing rust reads as false", in: "schema = 3\n\n[workspace]\ngo = true\npython = false\n", want: Manifest{3, Workspace{Go: true}}},
 		{name: "whitespace and comments", in: "# za\n  schema=3   # layout\n[ workspace ]\n\tpython = false\n go=true#x\n", want: Manifest{3, Workspace{Go: true}}},
 		{name: "crlf", in: "schema = 3\r\n[workspace]\r\ngo = true\r\npython = false\r\n", want: Manifest{3, Workspace{Go: true}}},
 		{name: "missing schema", in: "[workspace]\ngo = true\npython = false\n", err: "missing schema"},
@@ -26,7 +28,8 @@ func TestParse(t *testing.T) {
 		{name: "missing go", in: "schema = 3\n[workspace]\npython = false\n", err: "missing workspace.go"},
 		{name: "missing python", in: "schema = 3\n[workspace]\ngo = true\n", err: "missing workspace.python"},
 		{name: "schema inside table", in: "[workspace]\nschema = 3\ngo = true\npython = false\n", err: "unknown key workspace.schema"},
-		{name: "unknown key", in: "schema = 3\n[workspace]\ngo = true\npython = false\nrust = true\n", err: "unknown key workspace.rust"},
+		{name: "unknown key", in: "schema = 3\n[workspace]\ngo = true\npython = false\nrust = maybe\n", err: "invalid boolean"},
+		{name: "unknown key rejected", in: "schema = 3\n[workspace]\ngo = true\npython = false\nruby = true\n", err: "unknown key workspace.ruby"},
 		{name: "unknown table", in: "schema = 3\n[projects]\n", err: "unknown table [projects]"},
 		{name: "array table", in: "schema = 3\n[[workspace]]\n", err: "unsupported table header"},
 		{name: "duplicate table", in: "schema = 3\n[workspace]\ngo = true\npython = false\n[workspace]\n", err: "duplicate table"},

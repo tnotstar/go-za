@@ -22,6 +22,7 @@ Summary: Exact supported entry points for agents. Prefer project-owned scripts, 
 | OpenSpec | <discover: yes/no> | <discover: CLI / agent skill / not adopted> |
 | Go | <discover: yes/no> | <discover: version source and invocation> |
 | uv/Python | <discover: yes/no> | <discover: version source and invocation> |
+| Rust | <discover: yes/no> | <discover: version source and invocation> |
 
 ## Workspace contract
 

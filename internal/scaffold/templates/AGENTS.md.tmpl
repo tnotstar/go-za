@@ -44,6 +44,9 @@ _No projects registered._
 {{- if .Python}}
    - Python/uv: `.agents/context/python-standards.md`
 {{- end}}
+{{- if .Rust}}
+   - Rust: `.agents/context/rust-standards.md`
+{{- end}}
 5. Before a write task, confirm the project's pinned gitlink, checkout and upstream agree, and note whether context verification is pending in `status.md`.
 6. For normal writes, work in `.worktrees/<id>/<task-id>/`.
 7. Load more context only when a documented trigger applies.
@@ -56,8 +59,11 @@ _No projects registered._
 - Root `go.work` and the root uv workspace (`pyproject.toml`) are private integration overlays.
 {{else if .Go -}}
 - Root `go.work` is a private integration overlay.
-{{else -}}
+{{else if .Python -}}
 - The root uv workspace (`pyproject.toml`) is a private integration overlay.
+{{end -}}
+{{if .Rust -}}
+- The root Cargo workspace (`Cargo.toml`) is a private integration overlay; membership is explicit and empty until eligible projects are onboarded.
 {{end -}}
 - Root workspaces reference canonical project checkouts only and never replace a project's own dependency metadata.
 - Task worktrees are never permanent members of root language workspaces.

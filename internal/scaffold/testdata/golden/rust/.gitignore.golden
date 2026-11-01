@@ -1,0 +1,14 @@
+# Local Git worktrees.
+# Hygiene only; NOT a confidentiality boundary.
+/.worktrees/
+
+# Reconstructable agent runtime state.
+/.agents/runtime/
+
+# Root uv environment, when Python integration is enabled.
+/.venv/
+
+# Root Cargo build output, when Rust integration is enabled. Cargo
+# configuration may redirect output elsewhere; never rely on this rule.
+/target/
+

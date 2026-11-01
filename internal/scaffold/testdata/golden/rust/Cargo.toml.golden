@@ -1,0 +1,4 @@
+[workspace]
+members = []
+exclude = [".worktrees"]
+resolver = "3"

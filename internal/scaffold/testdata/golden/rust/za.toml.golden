@@ -1,0 +1,6 @@
+schema = 3
+
+[workspace]
+go = false
+python = false
+rust = true

@@ -35,6 +35,7 @@ const (
 type Options struct {
 	Go     bool
 	Python bool
+	Rust   bool
 }
 
 // File is one rendered file. Path is slash-separated and relative to the
@@ -56,6 +57,8 @@ type Scaffold struct {
 var conditional = map[string]func(Options) bool{
 	".agents/context/go-standards.md":     func(o Options) bool { return o.Go },
 	".agents/context/python-standards.md": func(o Options) bool { return o.Python },
+	".agents/context/rust-standards.md":   func(o Options) bool { return o.Rust },
+	"Cargo.toml":                          func(o Options) bool { return o.Rust },
 }
 
 var ignoredDirs = []string{".agents/runtime", ".worktrees"}

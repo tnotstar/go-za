@@ -1,0 +1,29 @@
+# Rust Workspace Standards
+
+Summary: Architecture-level Rust workspace conventions. Load only for Rust tasks. Style, lints and crate layout belong in each project's own context.
+
+## Two kinds of metadata
+
+| Files | Owner | Role |
+|---|---|---|
+| `<id>/Cargo.toml`, `<id>/Cargo.lock` | Project repository | Standalone manifest; lockfile follows that project's policy |
+| `/Cargo.toml`, `/Cargo.lock` (when present) | Private meta-repository | Virtual integration workspace; versioned |
+
+## MUST
+
+- R-01 The root `Cargo.toml` is a virtual workspace: no root `[package]`, explicit `members = []` until eligible projects are registered, `exclude = [".worktrees"]`, `resolver = "3"`. Never add members through a broad glob.
+- R-02 Each project owns its manifests, editions, minimum supported Rust version and lockfile policy. The integration toolchain does not rewrite them.
+- R-03 `Cargo.lock` files are written by Cargo, never by hand. A root lockfile created by a legitimate Cargo operation stays versioned; its absence in the empty bootstrap state is valid.
+- R-04 Workspace commands (`cargo check --workspace`, `cargo test --workspace`) exercise the private integration workspace. They never substitute for standalone validation, prove deployment, or demonstrate cross-project interaction by themselves.
+- R-05 `--manifest-path` alone is not workspace isolation. Before a standalone claim, resolve `workspace_root` and effective members with `cargo metadata`, confirm the selected root is the project's own and not the private meta-root, and run from the project root when its local `.cargo` configuration matters.
+- R-06 Exclusion from workspace membership does not isolate ancestor configuration or toolchain selection: a `.cargo/config.toml` above the project still applies. Inspect the actual project and its `.cargo` configuration before running commands, and identify the lockfile actually used.
+- R-07 Never load unrelated projects or task worktrees recursively. If isolation cannot be demonstrated inside a task worktree, validate a separate checkout outside the private meta-workspace ancestry.
+- R-08 rustfmt and clippy are project choices: use them only when the project uses them and the components are installed. Never install components, toolchains or dependencies as a side effect of a command.
+- R-09 Report integration-workspace-only failures separately from failures reproducible standalone.
+
+## Notes
+
+- Adding a package as a workspace member can change the effective resolver, lockfile, profiles, patches and feature resolution even when no project file is edited; future onboarding must assess those effects before membership.
+- A project that defines its own `[workspace]` is not flattened into the meta-workspace; detect that boundary before any membership decision.
+- There is no Cargo equivalent of `GOWORK=off`; do not invent one and do not present a separate target directory as isolation.
+- This workspace has no Rust project onboarding capability yet: `za project add` does not register Cargo members and no `za` command manages Cargo membership.

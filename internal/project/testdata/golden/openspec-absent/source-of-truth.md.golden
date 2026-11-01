@@ -11,8 +11,10 @@ Summary: The scoped authority map for this project. Each subject has exactly one
 | Configuration keys/defaults | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
 | Go dependencies | pub repository | `pub/go.mod` | not applicable |
 | Python dependencies | <discover: `pub` repository or not applicable> | <discover: `pub/pyproject.toml` or not applicable> | <discover: `pub/uv.lock` or not applicable> |
+| Cargo dependencies | <discover: `pub` repository or not applicable> | <discover: `pub/Cargo.toml` or not applicable> | <discover: `pub/Cargo.lock` or not applicable> |
 | Go integration overlay | private meta-repository | `/go.work` | <discover: revision or date> |
 | Python integration overlay | private meta-repository | <discover: `/pyproject.toml` + `/uv.lock` or not applicable> | <discover: revision or date> |
+| Cargo integration overlay | private meta-repository | <discover: `/Cargo.toml` or not applicable> | <discover: revision or date> |
 | Build/release implementation | pub repository | <discover: Makefile/script/CI path> | <discover: revision or date> |
 | Technical decisions | this project's private context | `.agents/context/pub/decisions/` | accepted ADRs |
 | Execution status | this project's private context | `.agents/context/pub/status.md` | informational only |

@@ -15,7 +15,11 @@ func TestParseArgs(t *testing.T) {
 	}{
 		{name: "go only", args: []string{"--go"}, want: Options{Go: true}},
 		{name: "python only", args: []string{"--python"}, want: Options{Python: true}},
+		{name: "rust only", args: []string{"--rust"}, want: Options{Rust: true}},
 		{name: "polyglot", args: []string{"--go", "--python"}, want: Options{Go: true, Python: true}},
+		{name: "go and rust", args: []string{"--go", "--rust"}, want: Options{Go: true, Rust: true}},
+		{name: "python and rust", args: []string{"--python", "--rust"}, want: Options{Python: true, Rust: true}},
+		{name: "all three", args: []string{"--go", "--python", "--rust"}, want: Options{Go: true, Python: true, Rust: true}},
 		{name: "single dash flags", args: []string{"-go", "-python"}, want: Options{Go: true, Python: true}},
 		{name: "path after flags", args: []string{"--go", "./ws"}, want: Options{Go: true, Path: "./ws"}},
 		{name: "path before flags", args: []string{"./ws", "--python"}, want: Options{Python: true, Path: "./ws"}},
@@ -26,10 +30,10 @@ func TestParseArgs(t *testing.T) {
 		{name: "separator after path", args: []string{"--go", "a", "--", "b"}, wantErr: true},
 		{name: "no workspace type", args: nil, wantErr: true},
 		{name: "path without workspace type", args: []string{"./ws"}, wantErr: true},
-		{name: "both explicitly false", args: []string{"--go=false", "--python=false"}, wantErr: true},
+		{name: "all explicitly false", args: []string{"--go=false", "--python=false", "--rust=false"}, wantErr: true},
 		{name: "two paths", args: []string{"--go", "a", "b"}, wantErr: true},
 		{name: "two paths around flag", args: []string{"a", "--go", "b"}, wantErr: true},
-		{name: "unknown option", args: []string{"--go", "--rust"}, wantErr: true},
+		{name: "unknown option", args: []string{"--go", "--ruby"}, wantErr: true},
 		{name: "empty path", args: []string{"--go", ""}, wantErr: true},
 	}
 	for _, tt := range tests {
@@ -62,7 +66,7 @@ func TestParseArgsHelp(t *testing.T) {
 
 func TestMissingWorkspaceTypeMessage(t *testing.T) {
 	_, err := ParseArgs(nil)
-	want := "at least one workspace type is required: --go and/or --python"
+	want := "at least one workspace type is required: --go, --python and/or --rust"
 	if err == nil || err.Error() != want {
 		t.Errorf("error = %v, want %q", err, want)
 	}

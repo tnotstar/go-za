@@ -98,8 +98,8 @@ func contextEdits(f facts) []edit {
 	}
 
 	edits := []edit{
-		{"INDEX.md", "- Language/runtime: <discover: go | python-uv | mixed | other>", "- Language/runtime: go"},
-		{"INDEX.md", "- Canonical workspace participation: <decide: go | uv | both | none>", "- Canonical workspace participation: go"},
+		{"INDEX.md", "- Language/runtime: <discover: go | python-uv | rust | mixed | other>", "- Language/runtime: go"},
+		{"INDEX.md", "- Canonical workspace participation: <decide: go | uv | cargo | mixed | none>", "- Canonical workspace participation: go"},
 		{"INDEX.md", "- Requirement authority: <discover: behavior authority>",
 			"- Requirement authority: " + behaviorAuthority},
 

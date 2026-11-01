@@ -132,6 +132,9 @@ func TestRunModes(t *testing.T) {
 			if tt.opts.Python {
 				wantContext = append(wantContext, "python-standards.md")
 			}
+			if tt.opts.Rust {
+				wantContext = append(wantContext, "rust-standards.md")
+			}
 			slices.Sort(wantContext)
 			if got := entries(t, filepath.Join(root, ".agents/context")); !slices.Equal(got, wantContext) {
 				t.Errorf(".agents/context contains %v, want %v", got, wantContext)
@@ -140,11 +143,103 @@ func TestRunModes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := fmt.Sprintf("schema = 3\n\n[workspace]\ngo = %t\npython = %t\n", tt.opts.Go, tt.opts.Python)
+			want := fmt.Sprintf("schema = 3\n\n[workspace]\ngo = %t\npython = %t\nrust = %t\n", tt.opts.Go, tt.opts.Python, tt.opts.Rust)
 			if string(manifest) != want {
 				t.Errorf("za.toml =\n%s\nwant\n%s", manifest, want)
 			}
 		})
+	}
+}
+
+// fakeRust answers the Rust probes and metadata validation of a fake run and
+// simulates the native git/go/uv outputs. The metadata response is derived
+// from the --manifest-path argument, so a wrongly built command fails
+// validation instead of passing vacuously.
+func fakeRust() *tooltest.Fake {
+	return &tooltest.Fake{
+		Effect: tooltest.Native,
+		Respond: func(c tool.Command) ([]byte, error) {
+			switch {
+			case c.Name == "rustup" && slices.Contains(c.Args, "active-toolchain"):
+				return []byte("stable-x86_64-unknown-linux-gnu (active, default)\n"), nil
+			case c.Name == "cargo" && slices.Contains(c.Args, "--version"):
+				return []byte("cargo 1.99.1 (5f94df478 2026-08-27)\n"), nil
+			case c.Name == "rustc" && slices.Contains(c.Args, "--version"):
+				return []byte("rustc 1.99.1 (58cf8f9c3 2026-10-13)\n"), nil
+			case c.Name == "cargo" && slices.Contains(c.Args, "metadata"):
+				manifest := ""
+				for i, a := range c.Args {
+					if a == "--manifest-path" {
+						manifest = c.Args[i+1]
+					}
+				}
+				return []byte(fmt.Sprintf(`{"version":3,"workspace_root":%q,"workspace_members":[],"packages":[],"target_directory":%q}`,
+					filepath.Dir(manifest), filepath.Join(filepath.Dir(manifest), "target"))), nil
+			}
+			return nil, nil
+		},
+	}
+}
+
+// TestRunRustOnlyMode initializes a Rust-only workspace with fake tools,
+// proving that neither go nor uv is probed or required.
+func TestRunRustOnlyMode(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "ws")
+	f := fakeRust()
+	f.Missing = map[string]bool{"go": true, "uv": true}
+	if _, err := f.LookPath("rustup"); err != nil {
+		t.Fatal("rustup unexpectedly missing")
+	}
+
+	res, err := Run(t.Context(), Options{Rust: true, Path: root}, fakeEnv(f))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !res.Rust || res.CargoLock {
+		t.Errorf("Result = %+v", res)
+	}
+	for _, p := range append(slices.Clone(commonPaths), "Cargo.toml", ".agents/context/rust-standards.md") {
+		if !exists(t, filepath.Join(root, filepath.FromSlash(p))) {
+			t.Errorf("missing %s", p)
+		}
+	}
+	for _, p := range []string{"go.work", "pyproject.toml", ".agents/context/go-standards.md",
+		".agents/context/python-standards.md", "Cargo.lock", "rust-toolchain.toml", "src"} {
+		if exists(t, filepath.Join(root, filepath.FromSlash(p))) {
+			t.Errorf("unexpected %s", p)
+		}
+	}
+	if got := string(readTestFile(t, filepath.Join(root, "Cargo.toml"))); got != "[workspace]\nmembers = []\nexclude = [\".worktrees\"]\nresolver = \"3\"\n" {
+		t.Errorf("Cargo.toml =\n%s", got)
+	}
+	if gitignore := readTestFile(t, filepath.Join(root, ".gitignore")); !strings.Contains(gitignore, "/target/") || strings.Contains(gitignore, "Cargo.lock") {
+		t.Errorf(".gitignore =\n%s", gitignore)
+	}
+	wantCalls := []tool.Command{
+		{Name: "rustup", Args: []string{"show", "active-toolchain"}, Env: []string{"RUSTUP_AUTO_INSTALL=0"}},
+		{Name: "cargo", Args: []string{"--version"}, Env: []string{"RUSTUP_AUTO_INSTALL=0", "RUSTUP_TOOLCHAIN=stable-x86_64-unknown-linux-gnu"}},
+		{Name: "rustc", Args: []string{"--version"}, Env: []string{"RUSTUP_AUTO_INSTALL=0", "RUSTUP_TOOLCHAIN=stable-x86_64-unknown-linux-gnu"}},
+		{Name: "git", Args: []string{"init", "--quiet"}, Dir: root},
+		{Name: "cargo", Args: []string{"metadata", "--format-version", "1", "--no-deps", "--offline", "--manifest-path", filepath.Join(root, "Cargo.toml")}, Dir: root, Env: []string{"RUSTUP_AUTO_INSTALL=0", "RUSTUP_TOOLCHAIN=stable-x86_64-unknown-linux-gnu"}},
+	}
+	if len(f.Calls) != len(wantCalls) {
+		t.Fatalf("calls = %v, want %v", f.Calls, wantCalls)
+	}
+	for i, c := range f.Calls {
+		w := wantCalls[i]
+		if c.Name != w.Name || !slices.Equal(c.Args, w.Args) || !slices.Equal(c.Env, w.Env) {
+			t.Errorf("call %d = %+v, want %+v", i, c, w)
+		}
+		for _, shell := range []string{"sh", "bash", "cmd", "cmd.exe", "powershell"} {
+			if c.Name == shell {
+				t.Errorf("call %d runs through a shell: %s", i, c)
+			}
+		}
+	}
+	for _, c := range f.Calls {
+		if c.Name == "go" || c.Name == "uv" {
+			t.Errorf("%s was invoked for a Rust-only workspace", c.Name)
+		}
 	}
 }
 
@@ -405,6 +500,129 @@ func TestRunPreflight(t *testing.T) {
 	}
 }
 
+// TestRunRustPreflightFailures pins the toolchain safeguards: a missing
+// override, an old toolchain or unparseable version output fails before the
+// target is touched, and never runs a download-capable resolution.
+func TestRunRustPreflightFailures(t *testing.T) {
+	tests := []struct {
+		name      string
+		missing   string
+		respond   func(c tool.Command) ([]byte, error)
+		want      string
+		wantCalls int // total calls before the failure
+	}{
+		{
+			name: "rustup override toolchain is not installed",
+			respond: func(c tool.Command) ([]byte, error) {
+				if c.Name == "rustup" {
+					return nil, errors.New("error: toolchain '1.70.0' is not installed")
+				}
+				return nil, nil
+			},
+			want:      "resolve the ambient override",
+			wantCalls: 1,
+		},
+		{
+			name: "cargo below the supported floor",
+			respond: func(c tool.Command) ([]byte, error) {
+				if c.Name == "cargo" && slices.Contains(c.Args, "--version") {
+					return []byte("cargo 1.70.0 (aaaa 2024-01-01)\n"), nil
+				}
+				return fakeRust().Respond(c)
+			},
+			want:      `cargo 1.70.0 is older than the supported floor 1.85.0`,
+			wantCalls: 2,
+		},
+		{
+			name: "rustc below the supported floor",
+			respond: func(c tool.Command) ([]byte, error) {
+				if c.Name == "rustc" && slices.Contains(c.Args, "--version") {
+					return []byte("rustc 1.84.1 (bbbb 2025-01-01)\n"), nil
+				}
+				return fakeRust().Respond(c)
+			},
+			want:      `rustc 1.84.1 is older than the supported floor 1.85.0`,
+			wantCalls: 3,
+		},
+		{
+			name: "unrecognized version output",
+			respond: func(c tool.Command) ([]byte, error) {
+				if c.Name == "cargo" && slices.Contains(c.Args, "--version") {
+					return []byte("cargo something odd\n"), nil
+				}
+				return fakeRust().Respond(c)
+			},
+			want:      "unrecognized version",
+			wantCalls: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parent := t.TempDir()
+			writeFile(t, filepath.Join(parent, "user.txt"))
+			target := filepath.Join(parent, "ws")
+			f := fakeRust()
+			if tt.missing != "" {
+				f.Missing = map[string]bool{tt.missing: true}
+			}
+			f.Respond = tt.respond
+
+			_, err := Run(t.Context(), Options{Rust: true, Path: target}, fakeEnv(f))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("err = %v, want containing %q", err, tt.want)
+			}
+			if len(f.Calls) != tt.wantCalls {
+				t.Errorf("calls = %d (%v), want %d", len(f.Calls), f.Calls, tt.wantCalls)
+			}
+			if exists(t, target) {
+				t.Error("target was created despite failed preflight")
+			}
+			if got := entries(t, parent); !slices.Equal(got, []string{"user.txt"}) {
+				t.Errorf("parent contains %v, want only user.txt", got)
+			}
+		})
+	}
+
+	t.Run("rustup absent probes plain executables", func(t *testing.T) {
+		target := filepath.Join(t.TempDir(), "ws")
+		f := fakeRust()
+		f.Missing = map[string]bool{"rustup": true}
+
+		if _, err := Run(t.Context(), Options{Rust: true, Path: target}, fakeEnv(f)); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		for _, c := range f.Calls {
+			if c.Name == "rustup" {
+				t.Error("rustup was invoked although absent")
+			}
+			if c.Name == "cargo" || c.Name == "rustc" {
+				if slices.Contains(c.Env, "RUSTUP_TOOLCHAIN=") {
+					t.Errorf("%s carries a toolchain pin although rustup is absent: %+v", c.Name, c)
+				}
+				if !slices.Contains(c.Env, "RUSTUP_AUTO_INSTALL=0") {
+					t.Errorf("%s lacks the RUSTUP_AUTO_INSTALL=0 guard: %+v", c.Name, c)
+				}
+			}
+		}
+	})
+
+	t.Run("cargo not required without --rust", func(t *testing.T) {
+		target := filepath.Join(t.TempDir(), "ws")
+		f := &tooltest.Fake{Missing: map[string]bool{"cargo": true, "rustc": true, "rustup": true}, Effect: tooltest.Native}
+		if _, err := Run(t.Context(), Options{Go: true, Path: target}, fakeEnv(f)); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		for _, c := range f.Calls {
+			if c.Name == "cargo" || c.Name == "rustup" || c.Name == "rustc" {
+				t.Errorf("%s was invoked although Rust was not selected: %+v", c.Name, c)
+			}
+		}
+		if exists(t, filepath.Join(target, "Cargo.toml")) {
+			t.Error("Cargo.toml generated without --rust")
+		}
+	})
+}
+
 func TestRunCleanupOnNativeFailure(t *testing.T) {
 	for _, failing := range []string{"git", "go", "uv"} {
 		t.Run("new target, "+failing+" fails", func(t *testing.T) {
@@ -549,6 +767,69 @@ func TestRunCleanupOnNativeFailure(t *testing.T) {
 			t.Errorf("target contains %v after cleanup, want empty", got)
 		}
 	})
+
+	t.Run("cargo metadata failure after earlier language steps cleans up", func(t *testing.T) {
+		parent := t.TempDir()
+		writeFile(t, filepath.Join(parent, "user.txt"))
+		target := filepath.Join(parent, "a", "ws")
+		f := fakeRust()
+		f.Effect = tooltest.Native
+		f.Respond = func(c tool.Command) ([]byte, error) {
+			if c.Name == "cargo" && slices.Contains(c.Args, "metadata") {
+				return nil, errors.New("cargo metadata: simulated failure")
+			}
+			return fakeRust().Respond(c)
+		}
+
+		_, err := Run(t.Context(), Options{Go: true, Python: true, Rust: true, Path: target}, fakeEnv(f))
+		if err == nil || !strings.Contains(err.Error(), "simulated failure") {
+			t.Fatalf("error = %v, want cargo metadata failure", err)
+		}
+		if strings.Contains(err.Error(), "cleanup incomplete") {
+			t.Errorf("unexpected incomplete cleanup: %v", err)
+		}
+		if got := entries(t, parent); !slices.Equal(got, []string{"user.txt"}) {
+			t.Errorf("parent contains %v after cleanup, want only user.txt", got)
+		}
+	})
+
+	t.Run("existing empty rust target returns to empty", func(t *testing.T) {
+		target := t.TempDir()
+		f := fakeRust()
+		f.Respond = func(c tool.Command) ([]byte, error) {
+			if c.Name == "cargo" && slices.Contains(c.Args, "metadata") {
+				return nil, errors.New("cargo metadata: simulated failure")
+			}
+			return fakeRust().Respond(c)
+		}
+		if _, err := Run(t.Context(), Options{Rust: true, Path: target}, fakeEnv(f)); err == nil {
+			t.Fatal("expected failure")
+		}
+		if exists(t, target) {
+			if got := entries(t, target); len(got) != 0 {
+				t.Errorf("target contains %v after cleanup, want empty", got)
+			}
+		} else {
+			t.Error("pre-existing target was removed")
+		}
+	})
+
+	t.Run("cancelled rust run stops before validation and cleans up", func(t *testing.T) {
+		target := t.TempDir()
+		ctx, cancel := context.WithCancel(t.Context())
+		f := fakeRust()
+		f.Effect = func(c tool.Command) error {
+			cancel() // interrupt arrives while git runs
+			return tooltest.Native(c)
+		}
+		_, err := Run(ctx, Options{Rust: true, Path: target}, fakeEnv(f))
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+		if got := entries(t, target); len(got) != 0 {
+			t.Errorf("target contains %v after cleanup, want empty", got)
+		}
+	})
 }
 
 func TestProjectName(t *testing.T) {
@@ -570,9 +851,19 @@ func TestProjectName(t *testing.T) {
 
 func TestSummary(t *testing.T) {
 	got := Result{Path: "/w", Go: true}.Summary()
-	want := "Initialized za workspace at /w\n  Git:    enabled\n  Go:     enabled\n  Python: disabled\n"
+	want := "Initialized za workspace at /w\n  Git:    enabled\n  Go:     enabled\n  Python: disabled\n  Rust:   disabled\n"
 	if got != want {
 		t.Errorf("Summary() = %q, want %q", got, want)
+	}
+	rust := Result{Path: "/w", Rust: true}.Summary()
+	wantRust := "Initialized za workspace at /w\n  Git:    enabled\n  Go:     disabled\n  Python: disabled\n  Rust:   enabled\n  Cargo lock: none (empty bootstrap state)\n"
+	if rust != wantRust {
+		t.Errorf("Summary() = %q, want %q", rust, wantRust)
+	}
+	locked := Result{Path: "/w", Rust: true, CargoLock: true}.Summary()
+	wantLocked := "Initialized za workspace at /w\n  Git:    enabled\n  Go:     disabled\n  Python: disabled\n  Rust:   enabled\n  Cargo lock: versioned (created by Cargo)\n"
+	if locked != wantLocked {
+		t.Errorf("Summary() = %q, want %q", locked, wantLocked)
 	}
 }
 
@@ -581,4 +872,13 @@ func writeFile(t *testing.T, path string) {
 	if err := os.WriteFile(path, []byte("user data\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func readTestFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }

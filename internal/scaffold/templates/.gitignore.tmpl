@@ -7,3 +7,8 @@
 
 # Root uv environment, when Python integration is enabled.
 /.venv/
+{{if .Rust}}
+# Root Cargo build output, when Rust integration is enabled. Cargo
+# configuration may redirect output elsewhere; never rely on this rule.
+/target/
+{{end}}

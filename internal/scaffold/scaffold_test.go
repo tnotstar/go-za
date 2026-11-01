@@ -3,6 +3,7 @@ package scaffold
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -20,7 +21,9 @@ var modes = []struct {
 }{
 	{"go", Options{Go: true}},
 	{"python", Options{Python: true}},
+	{"rust", Options{Rust: true}},
 	{"polyglot", Options{Go: true, Python: true}},
+	{"all", Options{Go: true, Python: true, Rust: true}},
 }
 
 // TestGolden compares every rendered file, per workspace mode, with
@@ -245,9 +248,11 @@ func TestTopLevel(t *testing.T) {
 
 func TestManifest(t *testing.T) {
 	want := map[string]string{
-		"go":       "schema = 3\n\n[workspace]\ngo = true\npython = false\n",
-		"python":   "schema = 3\n\n[workspace]\ngo = false\npython = true\n",
-		"polyglot": "schema = 3\n\n[workspace]\ngo = true\npython = true\n",
+		"go":       "schema = 3\n\n[workspace]\ngo = true\npython = false\nrust = false\n",
+		"python":   "schema = 3\n\n[workspace]\ngo = false\npython = true\nrust = false\n",
+		"rust":     "schema = 3\n\n[workspace]\ngo = false\npython = false\nrust = true\n",
+		"polyglot": "schema = 3\n\n[workspace]\ngo = true\npython = true\nrust = false\n",
+		"all":      "schema = 3\n\n[workspace]\ngo = true\npython = true\nrust = true\n",
 	}
 	for _, m := range modes {
 		s, err := Render(m.opts)
@@ -268,5 +273,126 @@ func TestManifest(t *testing.T) {
 		if !slices.Equal(manifests, []string{"za.toml"}) {
 			t.Errorf("%s: manifests rendered at %v, want only za.toml", m.name, manifests)
 		}
+	}
+}
+
+// TestAllLanguageCombinations covers every non-empty flag combination of
+// the "za init" interface: exact capability booleans, and the root Cargo
+// manifest only for Rust-enabled workspaces.
+func TestAllLanguageCombinations(t *testing.T) {
+	tests := []struct {
+		go_, python, rust bool
+	}{
+		{true, false, false},
+		{false, true, false},
+		{false, false, true},
+		{true, true, false},
+		{true, false, true},
+		{false, true, true},
+		{true, true, true},
+	}
+	for _, tt := range tests {
+		name := fmt.Sprintf("go=%t,python=%t,rust=%t", tt.go_, tt.python, tt.rust)
+		t.Run(name, func(t *testing.T) {
+			s, err := Render(Options{Go: tt.go_, Python: tt.python, Rust: tt.rust})
+			if err != nil {
+				t.Fatal(err)
+			}
+			byPath := map[string]string{}
+			for _, f := range s.Files {
+				byPath[f.Path] = string(f.Content)
+			}
+			wantManifest := fmt.Sprintf("schema = 3\n\n[workspace]\ngo = %t\npython = %t\nrust = %t\n", tt.go_, tt.python, tt.rust)
+			if got := byPath["za.toml"]; got != wantManifest {
+				t.Errorf("za.toml =\n%s\nwant\n%s", got, wantManifest)
+			}
+			wantCargo := "[workspace]\nmembers = []\nexclude = [\".worktrees\"]\nresolver = \"3\"\n"
+			if tt.rust {
+				if got := byPath["Cargo.toml"]; got != wantCargo {
+					t.Errorf("Cargo.toml =\n%s\nwant\n%s", got, wantCargo)
+				}
+			} else if got, ok := byPath["Cargo.toml"]; ok {
+				t.Errorf("Cargo.toml rendered without --rust:\n%s", got)
+			}
+		})
+	}
+}
+
+// TestRustScaffold guards the Rust bootstrap contract: a virtual workspace
+// manifest and no dummy package, source directory or toolchain file; Rust
+// documents, routing and ignore rules only for Rust-enabled workspaces.
+func TestRustScaffold(t *testing.T) {
+	tests := []struct {
+		name    string
+		opts    Options
+		present []string
+		absent  []string
+	}{
+		{
+			name:    "rust only",
+			opts:    Options{Rust: true},
+			present: []string{"Cargo.toml", ".agents/context/rust-standards.md"},
+			absent:  []string{"rust-toolchain.toml", "rust-toolchain", "src", ".agents/context/go-standards.md", ".agents/context/python-standards.md"},
+		},
+		{
+			name:   "go and python without rust",
+			opts:   Options{Go: true, Python: true},
+			absent: []string{"Cargo.toml", ".agents/context/rust-standards.md"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := Render(tt.opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			byPath := map[string][]byte{}
+			var paths []string
+			for _, f := range s.Files {
+				byPath[f.Path] = f.Content
+				paths = append(paths, f.Path)
+			}
+			for _, p := range tt.present {
+				if _, ok := byPath[p]; !ok {
+					t.Errorf("missing %s", p)
+				}
+			}
+			for _, p := range tt.absent {
+				if _, ok := byPath[p]; ok {
+					t.Errorf("za must not generate %s", p)
+				}
+			}
+
+			if cargo, ok := byPath["Cargo.toml"]; ok {
+				if bytes.Contains(cargo, []byte("[package]")) {
+					t.Error("root Cargo.toml must stay a virtual manifest without [package]")
+				}
+				if !bytes.Contains(cargo, []byte(`members = []`)) || !bytes.Contains(cargo, []byte(`exclude = [".worktrees"]`)) || !bytes.Contains(cargo, []byte(`resolver = "3"`)) {
+					t.Errorf("Cargo.toml lacks the required virtual workspace structure:\n%s", cargo)
+				}
+			}
+
+			// Rust routing exists exactly when Rust is selected, in both
+			// routers, and no router mentions rust-standards otherwise.
+			for _, router := range []string{"AGENTS.md", ".agents/context/INDEX.md"} {
+				c := byPath[router]
+				if c == nil {
+					t.Fatalf("%s not rendered", router)
+				}
+				if mentions := bytes.Contains(c, []byte("rust-standards")); mentions != tt.opts.Rust {
+					t.Errorf("%s rust-standards mention = %t, want %t:\n%s", router, mentions, tt.opts.Rust, c)
+				}
+			}
+
+			// The target directory is ignored for Rust workspaces only, and
+			// a root Cargo.lock is never ignored.
+			gitignore := string(byPath[".gitignore"])
+			if strings.Contains(gitignore, "/target/") != tt.opts.Rust {
+				t.Errorf(".gitignore /target/ rule = %t, want %t:\n%s", strings.Contains(gitignore, "/target/"), tt.opts.Rust, gitignore)
+			}
+			if strings.Contains(gitignore, "Cargo.lock") {
+				t.Errorf(".gitignore must not ignore Cargo.lock:\n%s", gitignore)
+			}
+		})
 	}
 }

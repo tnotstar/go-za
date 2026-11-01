@@ -1,0 +1,58 @@
+# Workspace Agent Router
+
+This is a private multi-repository AI/development workspace managed by `za`.
+
+## Non-negotiable rules
+
+- `za.toml` identifies the za workspace and its schema.
+- Private AI context lives only under `.agents/context/`; GLOBAL context files and project context directories are direct children of it.
+- Top-level project directories registered in `.gitmodules` are independent project repositories. Registration does not determine a repository's visibility.
+- Project repositories own their source, dependencies and requirements. OpenSpec is one possible requirement authority; never create or edit project files as a side effect of context work.
+- Each requirement scope has exactly one declared authority, recorded in the project's `source-of-truth.md`. Do not duplicate a requirement into a second location.
+- `.worktrees/**` holds task checkouts: execution state, not projects and not context.
+- Never recursively scan `.worktrees/`.
+- `.gitignore` is workspace hygiene only; never rely on it for confidentiality.
+- Never commit secret values anywhere.
+- Select one active project by default. The normal context boundary is GLOBAL plus that one PROJECT.
+- Do not read sibling project context unless the task explicitly spans projects.
+
+## Resolve the active project
+
+1. Project explicitly named by the task.
+2. Project containing a path explicitly named by the task.
+3. Inside `.worktrees/<id>/<task-id>/...`: project `<id>`.
+4. Inside `<id>/...` where `<id>` is registered in `.gitmodules`: project `<id>`.
+5. The single project affected by the relevant Git diff.
+
+If more than one candidate remains and the task is not explicitly multi-project, do not guess.
+
+## Projects
+
+<!-- za:projects:start -->
+_No projects registered._
+<!-- za:projects:end -->
+
+## Loading protocol
+
+1. Read `.agents/context/INDEX.md` and follow its routing.
+2. Read only the selected project's `.agents/context/<id>/INDEX.md`.
+3. Follow `.agents/context/roles.md` for the active role.
+4. Load a language standard only when the task involves that language:
+   - Rust: `.agents/context/rust-standards.md`
+5. Before a write task, confirm the project's pinned gitlink, checkout and upstream agree, and note whether context verification is pending in `status.md`.
+6. For normal writes, work in `.worktrees/<id>/<task-id>/`.
+7. Load more context only when a documented trigger applies.
+8. Stop reading once authority, constraints, workspace mode, validation commands and target area are known.
+
+## Workspace rules
+
+- `za.toml` is the za workspace manifest and schema marker, maintained by `za`. It is not context and defines no behavior.
+- The root Cargo workspace (`Cargo.toml`) is a private integration overlay; membership is explicit and empty until eligible projects are onboarded.
+- Root workspaces reference canonical project checkouts only and never replace a project's own dependency metadata.
+- Task worktrees are never permanent members of root language workspaces.
+- Workspace validation and standalone validation are different checks; one never substitutes for the other.
+
+## Context budget
+
+- This router: max 4 KiB. Context-root and project `INDEX.md`: max 3 KiB each.
+- Inspect source code progressively; never bulk-preload it.

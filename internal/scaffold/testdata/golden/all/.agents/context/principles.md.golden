@@ -1,0 +1,22 @@
+# Architecture Principles
+
+Summary: Cross-project principles for how context, requirements and workspaces relate. Application-architecture choices are not made here; each project records its own in `constraints.md` and ADRs.
+
+## MUST
+
+- A-01 Requirement content lives once, at its declared authority: a project's OpenSpec when adopted, otherwise the tracker, specification or system named in its `source-of-truth.md`. Private context links to it and never duplicates it.
+- A-02 Private AI context lives once: under `.agents/context/`.
+- A-03 Root language workspaces describe canonical project checkouts only.
+- A-04 Workspace validation never replaces standalone project validation.
+- A-05 No project depends on the private workspace for its own build or test correctness.
+- A-06 Every project context records the gitlink it was registered against (`Pinned gitlink` in `status.md`) separately from the revision its context was last reviewed against (`Context verified`). Observing a pin never marks context verified.
+
+## DEFAULT
+
+- A-07 Progressive disclosure: route first, load context on demand, stop as soon as the task is answerable.
+- A-08 Link; do not copy. One topic per file, with a short summary at the top and a stable filename.
+- A-09 When OpenSpec is adopted for a project, publishable intent, scope and design belong in its OpenSpec changes, and a change is created only when a functional contract changes: observable behavior, public API semantics, user-visible errors or externally meaningful configuration semantics. Behavior-preserving refactors, and fixes against a correct specification, need no new proposal.
+- A-10 Requirement text belongs at the declared requirement authority; confidential technical rationale belongs in private ADRs. Never publish private context or issue text as a side effect.
+- A-11 Project constraints are single, objectively verifiable MUST/MUST NOT rules, each with a verification method. Preferences are not constraints.
+- A-12 `status.md` stays short and current. Git history, archived changes, issue records and ADRs are the historical record.
+- A-13 When a document repeatedly exceeds its size ceiling, split it by topic or capability.

@@ -53,6 +53,12 @@ func TestDeriveID(t *testing.T) {
 		"https://github.com/org/roles.md":        "reserved",
 		"https://github.com/org/go-standards.md": "reserved",
 		"https://github.com/org/CLAUDE.md":       "reserved",
+		// Rust names, reserved regardless of the workspace's capabilities.
+		"https://github.com/org/rust-standards.md": "reserved",
+		"https://github.com/org/Cargo.toml":        "reserved",
+		"https://github.com/org/Cargo.lock":        "reserved",
+		"https://github.com/org/RUST-STANDARDS.MD": "reserved",
+		"https://github.com/org/cargo.toml":        "reserved",
 		// Case-equivalent names collide on case-insensitive filesystems.
 		"https://github.com/org/Policy.md": "reserved",
 		"https://github.com/org/ISSUES":    "reserved",

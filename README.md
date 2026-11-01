@@ -39,22 +39,26 @@ go build ./cmd/za     # produces ./za
 ## `za init`
 
 ```text
-za init [--go] [--python] [PATH]
+za init [--go] [--python] [--rust] [PATH]
 ```
 
 | Argument | Meaning |
 |---|---|
 | `--go` | Create a Go workspace with `go work init` |
 | `--python` | Create a uv integration workspace with `uv init` |
+| `--rust` | Create a root Cargo workspace scaffold (virtual manifest, no members) |
 | `PATH` | Target directory; defaults to the current directory |
 
-At least one of `--go` and `--python` is required. You can pass both. Flags
-may come before or after `PATH`.
+At least one of `--go`, `--python` and `--rust` is required. You can pass any
+combination. Flags may come before or after `PATH`.
 
 ```bash
 za init --go                      # Go workspace in the current directory
 za init --python ~/work/platform  # Python/uv workspace
-za init --go --python ../platform # polyglot workspace
+za init --rust work-on-rust       # Rust workspace scaffold
+za init --go --rust work-on-go-rust
+za init --python --rust work-on-python-rust
+za init --go --python --rust work-on-polyglot
 ```
 
 ### Target directory
@@ -72,6 +76,7 @@ za init --go --python ../platform # polyglot workspace
 | `git` | always |
 | `go` | with `--go` |
 | `uv` | with `--python` |
+| `cargo` and `rustc` | with `--rust` (version 1.85.0 or newer) |
 
 `za` checks for all required tools before it touches the filesystem. It runs
 them directly, never through a shell:
@@ -81,6 +86,8 @@ git init --quiet
 GOWORK=off go work init
 uv init --bare --vcs none --author-from none --no-workspace \
         --no-python-downloads --no-config --name <name> <PATH>
+cargo metadata --format-version 1 --no-deps --offline \
+        --manifest-path <PATH>/Cargo.toml
 ```
 
 `<name>` is the directory name normalized to a valid Python project name. For
@@ -107,6 +114,56 @@ exclude = [".worktrees/**"]
 `za` keeps any other `[tool.*]` tables that uv generates. If uv's output
 already defines anything under `tool.uv`, `za` refuses to overwrite it and
 rolls back.
+
+### Rust workspace
+
+`za init --rust` writes a deterministic, **virtual** root `Cargo.toml` — no
+root package, no source directory, no dummy crate, no `rust-toolchain.toml`:
+
+```toml
+[workspace]
+members = []
+exclude = [".worktrees"]
+resolver = "3"
+```
+
+`za` creates this scaffold directly; it never runs `cargo new` or `cargo
+init`. It then proves the scaffold with the installed Cargo: `cargo metadata
+--format-version 1 --no-deps --offline` must resolve `workspace_root` to the
+new workspace, report zero members and zero packages, and work fully offline.
+A workspace with no members is the valid empty bootstrap state — there is
+nothing to `cargo check` or `cargo test` yet, and `za` never adds a synthetic
+member to make the workspace compile.
+
+The supported toolchain floor is **1.85.0** for both `cargo` and `rustc` —
+the explicit minimum for resolver 3 and Rust 2024 support. `za` checks the
+effective installed executables and fails before touching the filesystem if
+they are missing or older. It never installs, updates or downloads
+toolchains: all Cargo invocations set `RUSTUP_AUTO_INSTALL=0`, and when
+rustup manages the installation, `za` pins `RUSTUP_TOOLCHAIN` to the
+toolchain resolved at preflight so ambient `rust-toolchain.toml` files or
+environment overrides cannot redirect — and thereby silently download — a
+different toolchain during initialization. If the active toolchain selection
+is not installed, `za` fails with an actionable error instead.
+
+Ownership and reproducibility:
+
+- The root `Cargo.toml` is private meta-repository content and versioned.
+- The root `/target/` directory is ignored for hygiene. Cargo configuration
+  may redirect output elsewhere; the ignore rule is not a boundary.
+- A root `Cargo.lock` is **not** ignored. The metadata validation creates
+  none for the empty workspace; if a later, legitimate Cargo operation
+  creates one, it stays versioned. `za` never writes a lockfile by hand.
+- Future project members keep their own manifests and lockfile policies.
+  Once a package is a workspace member, Cargo uses the workspace lockfile
+  for that invocation, regardless of the project's own on-disk lockfile.
+
+Rust project onboarding (registering Cargo members, existing-workspace
+handling, dependency wiring) is future work. Registering a project with
+`za project add` does not touch Cargo membership, and `exclude =
+[".worktrees"]` keeps task worktrees out of the integration workspace —
+though exclusion from membership does not isolate ancestor Cargo
+configuration; see `rust-standards.md` in a generated workspace.
 
 ### Exit status
 
@@ -229,11 +286,12 @@ invalid usage.
 ├── CLAUDE.md                points Claude Code to AGENTS.md
 ├── go.work                  --go only, written by the Go toolchain
 ├── pyproject.toml           --python only, written by uv, then extended
+├── Cargo.toml               --rust only: virtual workspace, no members
 ├── .agents/
 │   ├── context/
 │   │   ├── INDEX.md         context router (GLOBAL ↔ PROJECT ↔ issues)
 │   │   ├── policy.md        GLOBAL context: policy, principles, tooling,
-│   │   │                    roles, glossary, go/python standards
+│   │   │                    roles, glossary, go/python/rust standards
 │   │   ├── templates/project/   PROJECT context templates
 │   │   ├── templates/issue.md   issue template (issue commands come later)
 │   │   └── <project-id>/    PROJECT contexts (created by za project add)
@@ -248,8 +306,10 @@ PROJECT context under `<project-id>/`, private to one project and inheriting
 from GLOBAL. `.agents/context/INDEX.md` is the router between them; it never
 duplicates the project list (that is derived from `.gitmodules`) and never
 embeds issue bodies. Language standards are generated only for the languages
-you select. Project IDs must not collide with context infrastructure names;
-`za project add` rejects reserved names and case-equivalent collisions.
+you select (`go-standards.md`, `python-standards.md`, `rust-standards.md`),
+but `rust-standards.md` is a reserved name in every workspace. Project IDs
+must not collide with context infrastructure names; `za project add`
+rejects reserved names and case-equivalent collisions.
 
 > **`.worktrees/` is ignored for hygiene, not confidentiality.** Private
 > context stays private because it lives in the private meta-repository,
@@ -267,6 +327,7 @@ schema = 3
 [workspace]
 go = true
 python = false
+rust = false
 ```
 
 | Key | Meaning |
@@ -274,6 +335,11 @@ python = false
 | `schema` | Version of the workspace layout. It is independent of the `za` release version. |
 | `workspace.go` | The workspace was initialized with `--go` |
 | `workspace.python` | The workspace was initialized with `--python` |
+| `workspace.rust` | The workspace was initialized with `--rust` |
+
+`za` always writes all three capability booleans. Reading a schema-3
+manifest without `workspace.rust` (written by an earlier schema-3 release)
+means `rust = false`; invalid types are rejected.
 
 The manifest belongs to `za`, not to the agent context under `.agents/`. It
 only marks the directory as a `za` workspace. Projects, paths and tool
@@ -317,7 +383,11 @@ does not have, and commands will fail on the missing structure (for example
 the context templates or `INDEX.md`).
 
 Older `za` binaries likewise reject schema-3 manifests as unsupported instead
-of partially handling them.
+of partially handling them. Binaries from before the Rust capability reject a
+Rust-enabled manifest outright with `unknown key workspace.rust` — they never
+silently ignore the capability or partially apply it. A Rust-enabled
+workspace therefore requires a `za` binary with Rust support; there is no
+downgrade path, and no schema bump was needed for this additive capability.
 
 ## Development
 

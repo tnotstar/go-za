@@ -21,7 +21,7 @@ func TestAddRouteFirstProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := before + region(routesHeader+"\n"+routesRule+"\n"+
-		"| `go-za` | `go-za/` | `.agents/context/projects/go-za/INDEX.md` |\n") + after
+		"| `go-za` | `go-za/` | `.agents/context/go-za/INDEX.md` |\n") + after
 	if string(got) != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}

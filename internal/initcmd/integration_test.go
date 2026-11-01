@@ -54,7 +54,7 @@ func TestRealTools(t *testing.T) {
 				t.Errorf("za.toml is ignored but must be tracked: %s", out)
 			}
 			manifest, err := os.ReadFile(filepath.Join(root, "za.toml"))
-			if want := fmt.Sprintf("schema = 1\n\n[workspace]\ngo = %t\npython = %t\n", tt.opts.Go, tt.opts.Python); err != nil || string(manifest) != want {
+			if want := fmt.Sprintf("schema = 3\n\n[workspace]\ngo = %t\npython = %t\n", tt.opts.Go, tt.opts.Python); err != nil || string(manifest) != want {
 				t.Errorf("za.toml = %q (%v), want %q", manifest, err, want)
 			}
 

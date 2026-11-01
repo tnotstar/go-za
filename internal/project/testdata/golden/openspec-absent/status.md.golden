@@ -1,0 +1,21 @@
+# Project Status: pub
+
+- Phase: bootstrap
+- Pin observed: 2026-10-01
+- Pinned gitlink: `<GITLINK>`
+- Context verified: pending (registration observed the pin; no review has confirmed it)
+
+## In progress
+
+- none
+
+## Known issues
+
+- Context bootstrap incomplete: `tools.md`, `constraints.md` and `source-of-truth.md` still hold discovery and decision placeholders.
+- Context verification is pending: the recorded pin has not been reviewed.
+
+## Next steps
+
+- Resolve the placeholders in `tools.md` and `source-of-truth.md` from the project repository.
+- Declare the requirement authority for observable behavior in `source-of-truth.md`.
+- Record only real, verifiable rules in `constraints.md`.

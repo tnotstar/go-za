@@ -18,10 +18,10 @@ const (
 	routesRule   = "|---|---|---|"
 )
 
-var routeRow = regexp.MustCompile("^\\| `([^`]+)` \\| `([^`]+)/` \\| `\\.agents/context/projects/([^`]+)/INDEX\\.md` \\|$")
+var routeRow = regexp.MustCompile("^\\| `([^`]+)` \\| `([^`]+)/` \\| `\\.agents/context/([^`]+)/INDEX\\.md` \\|$")
 
 func routeLine(id string) string {
-	return fmt.Sprintf("| `%s` | `%s/` | `.agents/context/projects/%s/INDEX.md` |", id, id, id)
+	return fmt.Sprintf("| `%s` | `%s/` | `.agents/context/%s/INDEX.md` |", id, id, id)
 }
 
 // addRoute returns agents with a route to id added to the managed region.

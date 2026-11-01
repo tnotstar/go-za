@@ -1,18 +1,20 @@
 # Source of Truth: pub
 
-Summary: Where each kind of project information is authoritative. Every path must exist or be marked `not applicable`; never list hypothetical paths.
+Summary: The scoped authority map for this project. Each subject has exactly one declared authority; locations must be real paths or references, or marked `unresolved`/`not applicable`. Never list hypothetical paths and never keep two active authorities for one scope.
 
-| Information | Authoritative location | Visibility | Derived / secondary | Read trigger |
-|---|---|---|---|---|
-| Current observable behavior | `pub/openspec/specs/` | Public | Code/tests | Behavior work |
-| Proposed behavior | `pub/openspec/changes/<change>/` | Public | In-flight implementation | Assigned change |
-| API contract | <discover: actual path or not applicable> | <discover: Public/Private> | <discover: generated outputs> | API change |
-| Database/schema | <discover: actual path or not applicable> | <discover: Public/Private> | <discover: generated outputs> | Schema change |
-| Configuration keys/defaults | <discover: actual path or not applicable> | <discover: Public/Private> | Documentation | Config change |
-| Go dependencies | `pub/go.mod` | Public | `pub/go.sum` | Go dependency work |
-| Python dependencies | <discover: `pub/pyproject.toml` or not applicable> | Public | `pub/uv.lock` | Python dependency work |
-| Canonical Go integration overlay | `/go.work` | Private | `/go.work.sum` | Cross-project Go integration |
-| Canonical Python integration overlay | <discover: `/pyproject.toml` + `/uv.lock` or not applicable> | Private | workspace environment | Cross-project Python integration |
-| Build/release implementation | <discover: Makefile/script/CI path> | Public | `tools.md` invocation index | Tooling work |
-| Technical decisions | `.agents/context/projects/pub/decisions/` | Private | None | Architecture question |
-| Execution status | `.agents/context/projects/pub/status.md` | Private | None | In-flight work |
+| Subject/scope | Authority | Location | State or revision |
+|---|---|---|---|
+| Observable behavior (current) | OpenSpec (detected; confirm authority) | `pub/openspec/specs/` | <discover: revision or date> |
+| Observable behavior (proposed) | OpenSpec (detected; confirm authority) | `pub/openspec/changes/` | <discover: revision or date> |
+| API contract | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
+| Database/schema | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
+| Configuration keys/defaults | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
+| Go dependencies | pub repository | `pub/go.mod` | `pub/go.sum` |
+| Python dependencies | <discover: `pub` repository or not applicable> | <discover: `pub/pyproject.toml` or not applicable> | <discover: `pub/uv.lock` or not applicable> |
+| Go integration overlay | private meta-repository | `/go.work` | <discover: revision or date> |
+| Python integration overlay | private meta-repository | <discover: `/pyproject.toml` + `/uv.lock` or not applicable> | <discover: revision or date> |
+| Build/release implementation | pub repository | <discover: Makefile/script/CI path> | <discover: revision or date> |
+| Technical decisions | this project's private context | `.agents/context/pub/decisions/` | accepted ADRs |
+| Execution status | this project's private context | `.agents/context/pub/status.md` | informational only |
+
+Authority is scoped: different subjects may have different authoritative sources without duplication. A draft issue or agent suggestion does not override an accepted requirement; implementation is evidence of actual behavior, and a discrepancy with the agreed requirement is reported, not silently normalized. An external authority remains authoritative even when it cannot be fetched; record the gap instead of fabricating its contents.

@@ -12,7 +12,7 @@ const Usage = `Usage:
   za project <command> [arguments]
 
 Commands:
-  add     Add a public Go repository as a workspace project
+  add     Add a Go repository as a workspace project
 
 Run "za project <command> --help" for details about a command.
 `
@@ -28,15 +28,15 @@ component of <repo-url> without a trailing ".git".
 The command:
   - runs "git submodule add -- <repo-url> <project-id>";
   - requires <project-id>/go.mod and runs "go work use ./<project-id>";
-  - creates the private context .agents/context/projects/<project-id>/;
+  - creates the private context .agents/context/<project-id>/;
   - adds the project route to the za-managed region of AGENTS.md;
   - stages the whole change without committing it.
 
-It never writes to the public repository. If any step fails, the workspace
+It never writes to the project repository. If any step fails, the workspace
 is rolled back to its previous state.
 
-Requirements: a Go-enabled za workspace (za.toml), with a committed bootstrap
-and no uncommitted changes; executables git and go.
+Requirements: a schema-3 Go-enabled za workspace (za.toml), with a committed
+bootstrap and no uncommitted changes; executables git and go.
 `
 
 // UsageError reports invalid command-line usage.

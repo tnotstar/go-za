@@ -4,9 +4,11 @@ This is a private multi-repository AI/development workspace managed by `za`.
 
 ## Non-negotiable rules
 
-- Private AI context lives only under `.agents/context/`.
-- Top-level project directories registered in `.gitmodules` are PUBLIC Git submodules.
-- `<project>/openspec/**` is PUBLIC. Write only publishable content there.
+- `za.toml` identifies the za workspace and its schema.
+- Private AI context lives only under `.agents/context/`; GLOBAL context files and project context directories are direct children of it.
+- Top-level project directories registered in `.gitmodules` are independent project repositories. Registration does not determine a repository's visibility.
+- Project repositories own their source, dependencies and requirements. OpenSpec is one possible requirement authority; never create or edit project files as a side effect of context work.
+- Each requirement scope has exactly one declared authority, recorded in the project's `source-of-truth.md`. Do not duplicate a requirement into a second location.
 - `.worktrees/**` holds task checkouts: execution state, not projects and not context.
 - Never recursively scan `.worktrees/`.
 - `.gitignore` is workspace hygiene only; never rely on it for confidentiality.
@@ -19,7 +21,7 @@ This is a private multi-repository AI/development workspace managed by `za`.
 1. Project explicitly named by the task.
 2. Project containing a path explicitly named by the task.
 3. Inside `.worktrees/<id>/<task-id>/...`: project `<id>`.
-4. Inside `<id>/...` where `<id>` is a registered submodule path: project `<id>`.
+4. Inside `<id>/...` where `<id>` is registered in `.gitmodules`: project `<id>`.
 5. The single project affected by the relevant Git diff.
 
 If more than one candidate remains and the task is not explicitly multi-project, do not guess.
@@ -32,17 +34,17 @@ _No projects registered._
 
 ## Loading protocol
 
-1. Global MUST rules: `.agents/context/_global/policy.md`.
-2. Read only the selected project's `.agents/context/projects/<id>/INDEX.md`.
-3. Follow `.agents/context/_global/roles.md` for the active role.
+1. Read `.agents/context/INDEX.md` and follow its routing.
+2. Read only the selected project's `.agents/context/<id>/INDEX.md`.
+3. Follow `.agents/context/roles.md` for the active role.
 4. Load a language standard only when the task involves that language:
 {{- if .Go}}
-   - Go: `.agents/context/_global/go-standards.md`
+   - Go: `.agents/context/go-standards.md`
 {{- end}}
 {{- if .Python}}
-   - Python/uv: `.agents/context/_global/python-standards.md`
+   - Python/uv: `.agents/context/python-standards.md`
 {{- end}}
-5. Before a write task, confirm the project's pinned gitlink, checkout, upstream and `status.md` verification SHA agree.
+5. Before a write task, confirm the project's pinned gitlink, checkout and upstream agree, and note whether context verification is pending in `status.md`.
 6. For normal writes, work in `.worktrees/<id>/<task-id>/`.
 7. Load more context only when a documented trigger applies.
 8. Stop reading once authority, constraints, workspace mode, validation commands and target area are known.
@@ -57,12 +59,11 @@ _No projects registered._
 {{else -}}
 - The root uv workspace (`pyproject.toml`) is a private integration overlay.
 {{end -}}
-- Root workspaces reference canonical submodule checkouts only and never replace a project's own dependency metadata.
+- Root workspaces reference canonical project checkouts only and never replace a project's own dependency metadata.
 - Task worktrees are never permanent members of root language workspaces.
 - Workspace validation and standalone validation are different checks; one never substitutes for the other.
 
 ## Context budget
 
-- Router: max 4 KiB. Project index: max 3 KiB.
-- Context before source inspection: max 8,000 tokens; total per task: max 12,000 tokens.
+- This router: max 4 KiB. Context-root and project `INDEX.md`: max 3 KiB each.
 - Inspect source code progressively; never bulk-preload it.

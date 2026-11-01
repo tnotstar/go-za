@@ -18,6 +18,9 @@ func TestDeriveID(t *testing.T) {
 		"/srv/git/foo":                      "foo",
 		"../foo.git":                        "foo",
 		"https://host/org/repo.git.git":     "repo.git",
+		// Suffix-less names that merely resemble reserved files stay valid.
+		"https://github.com/org/principles": "principles",
+		"https://github.com/org/policies":   "policies",
 	}
 	for in, want := range valid {
 		got, err := DeriveID(in)
@@ -40,6 +43,22 @@ func TestDeriveID(t *testing.T) {
 		"https://github.com/org/ñu":      "only ASCII",
 		"https://github.com/org/za.toml": "reserved",
 		"https://github.com/org/go.work": "reserved",
+		// Reserved context names under the schema-3 flat layout.
+		"https://github.com/org/issues":          "reserved",
+		"https://github.com/org/templates":       "reserved",
+		"https://github.com/org/INDEX.md":        "reserved",
+		"https://github.com/org/policy.md":       "reserved",
+		"https://github.com/org/tooling.md":      "reserved",
+		"https://github.com/org/glossary.md":     "reserved",
+		"https://github.com/org/roles.md":        "reserved",
+		"https://github.com/org/go-standards.md": "reserved",
+		"https://github.com/org/CLAUDE.md":       "reserved",
+		// Case-equivalent names collide on case-insensitive filesystems.
+		"https://github.com/org/Policy.md": "reserved",
+		"https://github.com/org/ISSUES":    "reserved",
+		"https://github.com/org/Templates": "reserved",
+		"https://github.com/org/ZA.TOML":   "reserved",
+		"https://github.com/org/index.md":  "reserved",
 	}
 	for in, want := range invalid {
 		got, err := DeriveID(in)

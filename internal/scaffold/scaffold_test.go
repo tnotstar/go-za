@@ -111,13 +111,15 @@ func TestRenderIsDeterministic(t *testing.T) {
 
 // Hard size ceilings from the architecture's context budget.
 var ceilings = map[string]int{
-	"AGENTS.md": 4 << 10,
-	".agents/context/_global/templates/project/INDEX.md":           3 << 10,
-	".agents/context/_global/templates/project/tools.md":           6 << 10,
-	".agents/context/_global/templates/project/constraints.md":     6 << 10,
-	".agents/context/_global/templates/project/source-of-truth.md": 6 << 10,
-	".agents/context/_global/templates/project/status.md":          2 << 10,
-	".agents/context/_global/templates/project/adr.md":             6 << 10,
+	"AGENTS.md":                                            4 << 10,
+	".agents/context/INDEX.md":                             3 << 10,
+	".agents/context/templates/issue.md":                   12 << 10,
+	".agents/context/templates/project/INDEX.md":           3 << 10,
+	".agents/context/templates/project/tools.md":           6 << 10,
+	".agents/context/templates/project/constraints.md":     6 << 10,
+	".agents/context/templates/project/source-of-truth.md": 6 << 10,
+	".agents/context/templates/project/status.md":          2 << 10,
+	".agents/context/templates/project/adr.md":             6 << 10,
 }
 
 func TestContextSizeBudgets(t *testing.T) {
@@ -127,7 +129,7 @@ func TestContextSizeBudgets(t *testing.T) {
 	}
 	for _, f := range s.Files {
 		limit, ok := ceilings[f.Path]
-		if !ok && strings.HasPrefix(f.Path, ".agents/context/_global/") && !strings.Contains(f.Path, "/templates/") {
+		if !ok && strings.HasPrefix(f.Path, ".agents/context/") && !strings.Contains(f.Path, "/templates/") {
 			limit, ok = 8<<10, true
 		}
 		if ok && len(f.Content) > limit {
@@ -137,6 +139,7 @@ func TestContextSizeBudgets(t *testing.T) {
 }
 
 func TestRenderedContentInvariants(t *testing.T) {
+	obsolete := []string{".agents/context/_global/", ".agents/context/projects/"}
 	for _, m := range modes {
 		s, err := Render(m.opts)
 		if err != nil {
@@ -155,6 +158,39 @@ func TestRenderedContentInvariants(t *testing.T) {
 			if strings.Contains(f.Path, "openspec") {
 				t.Errorf("%s/%s: za must not generate OpenSpec content", m.name, f.Path)
 			}
+			for _, o := range obsolete {
+				if strings.Contains(f.Path, o) || bytes.Contains(f.Content, []byte(o)) {
+					t.Errorf("%s/%s: references obsolete pre-v5 context path %s", m.name, f.Path, o)
+				}
+			}
+		}
+	}
+}
+
+// TestContextRootRouter guards the schema-3 routing structure: the context
+// root carries an INDEX.md router, the shared issue template exists, and no
+// empty project-container directory is generated.
+func TestContextRootRouter(t *testing.T) {
+	for _, m := range modes {
+		s, err := Render(m.opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var paths []string
+		for _, f := range s.Files {
+			paths = append(paths, f.Path)
+		}
+		for _, want := range []string{
+			".agents/context/INDEX.md",
+			".agents/context/templates/issue.md",
+			".agents/context/templates/project/INDEX.md",
+		} {
+			if !slices.Contains(paths, want) {
+				t.Errorf("%s: %s not rendered", m.name, want)
+			}
+		}
+		if slices.Contains(paths, ".agents/context/projects/.gitkeep") {
+			t.Errorf("%s: generated the obsolete .agents/context/projects container", m.name)
 		}
 	}
 }
@@ -209,9 +245,9 @@ func TestTopLevel(t *testing.T) {
 
 func TestManifest(t *testing.T) {
 	want := map[string]string{
-		"go":       "schema = 1\n\n[workspace]\ngo = true\npython = false\n",
-		"python":   "schema = 1\n\n[workspace]\ngo = false\npython = true\n",
-		"polyglot": "schema = 1\n\n[workspace]\ngo = true\npython = true\n",
+		"go":       "schema = 3\n\n[workspace]\ngo = true\npython = false\n",
+		"python":   "schema = 3\n\n[workspace]\ngo = false\npython = true\n",
+		"polyglot": "schema = 3\n\n[workspace]\ngo = true\npython = true\n",
 	}
 	for _, m := range modes {
 		s, err := Render(m.opts)

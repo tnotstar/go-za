@@ -5,16 +5,34 @@ import (
 	"strings"
 )
 
-// reservedIDs are names a project directory must never take at the workspace
-// root because za or a native workspace tool owns them.
-var reservedIDs = map[string]bool{
-	"AGENTS.md":      true,
-	"CLAUDE.md":      true,
-	"go.work":        true,
-	"go.work.sum":    true,
-	"pyproject.toml": true,
-	"uv.lock":        true,
-	"za.toml":        true,
+// reservedIDs are names a project directory must never take. Workspace-root
+// files are owned by za or native tools; the context names are reserved
+// direct children of .agents/context/ under the workspace schema. Existing
+// user-authored GLOBAL topics also occupy that namespace and are checked
+// separately against the live context directory.
+//
+// Comparison is case-insensitive: on case-insensitive filesystems a
+// case-equivalent name would collide with the reserved entry.
+var reservedIDs = []string{
+	// Workspace-root files.
+	"AGENTS.md",
+	"CLAUDE.md",
+	"go.work",
+	"go.work.sum",
+	"pyproject.toml",
+	"uv.lock",
+	"za.toml",
+	// Reserved direct children of .agents/context/.
+	"INDEX.md",
+	"policy.md",
+	"principles.md",
+	"go-standards.md",
+	"python-standards.md",
+	"tooling.md",
+	"roles.md",
+	"glossary.md",
+	"templates",
+	"issues",
 }
 
 // DeriveID returns the project ID for a repository URL: its final path
@@ -53,8 +71,11 @@ func validateID(id string) error {
 		return fmt.Errorf("%q would be a hidden top-level directory", id)
 	case id[0] == '-':
 		return fmt.Errorf("%q starts with \"-\"", id)
-	case reservedIDs[id]:
-		return fmt.Errorf("%q is reserved for a workspace file", id)
+	}
+	for _, name := range reservedIDs {
+		if strings.EqualFold(id, name) {
+			return fmt.Errorf("%q is reserved: it collides with workspace file or context name %q", id, name)
+		}
 	}
 	for _, r := range id {
 		if !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-') {

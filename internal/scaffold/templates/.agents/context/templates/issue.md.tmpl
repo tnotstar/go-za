@@ -1,0 +1,44 @@
+---
+format: 1
+id: ZA-<lowercase-uuid-v4>
+title: <one line: the problem or intended change>
+scope: <project | workspace>
+projects: [<project-id>]
+status: open
+---
+
+## Problem
+
+To be clarified.
+
+<!-- za issue template: copy this file to the issue's own location and fill it
+in; the copy, not this template, is the record. Every <...> placeholder must
+be replaced before the issue is valid; a placeholder left in place is
+invalid data, never a default. In particular:
+
+- `id` is `ZA-` followed by a lowercase UUIDv4 generated fresh for THIS
+  issue and checked for uniqueness in the workspace. Never keep the
+  placeholder, reuse the id of another issue, or invent a sequential
+  number. The id never changes, not on rename, reopen or cancel.
+- `projects` names registered projects of this workspace (as listed in
+  .gitmodules) by their exact project IDs. Never keep the placeholder.
+- `scope` is `project` or `workspace`. A project issue names exactly its
+  enclosing project in `projects`; a workspace issue names the affected
+  projects, and an empty list is valid for workspace-only work.
+- `status` starts as `open`; later states are `in-progress`, `closed` and
+  `cancelled`.
+
+Optional front-matter keys: `priority` (low | normal | high | urgent),
+`labels` (string list), `depends_on` (issue IDs), `external_refs`
+(references).
+
+Project issues live at `.agents/context/<project-id>/issues/`; workspace
+and cross-project issues at `.agents/context/issues/`. Store the values
+of affected projects and the status in the front matter, and keep facts,
+hypotheses, proposals and accepted decisions distinguishable in the body.
+
+Add body sections only when they carry content; never keep empty
+boilerplate: scope and exclusions; facts and sources; hypotheses and open
+questions; acceptance criteria with stable IDs (AC-01, AC-02, ...);
+accepted decisions; implementation references and evidence; outcome or
+cancellation reason. -->

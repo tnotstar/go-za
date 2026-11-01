@@ -54,8 +54,8 @@ type Scaffold struct {
 
 // conditional lists files rendered only for some workspace types.
 var conditional = map[string]func(Options) bool{
-	".agents/context/_global/go-standards.md":     func(o Options) bool { return o.Go },
-	".agents/context/_global/python-standards.md": func(o Options) bool { return o.Python },
+	".agents/context/go-standards.md":     func(o Options) bool { return o.Go },
+	".agents/context/python-standards.md": func(o Options) bool { return o.Python },
 }
 
 var ignoredDirs = []string{".agents/runtime", ".worktrees"}

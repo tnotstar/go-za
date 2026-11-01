@@ -2,11 +2,14 @@
 
 `za` sets up and will manage **private multi-repository AI/development
 workspaces**. In such a workspace, one private Git meta-repository holds
-private AI-agent context, native Go/uv integration workspaces and public
-projects as Git submodules.
+private AI-agent context, native Go/uv integration workspaces and
+independent project repositories as Git submodules.
 
 `za` replaces the hand-written shell scripts that such workspaces otherwise
 need. It is written entirely in Go and builds a single executable, `za`.
+
+Registration as a submodule says nothing about a repository's visibility;
+projects may be public, client-private or otherwise restricted.
 
 ## Current scope
 
@@ -123,9 +126,11 @@ create; it reports them and leaves them in place.
 za project add <repo-url>
 ```
 
-Adds the repository at `<repo-url>` to the enclosing workspace as a public
-project. This is the **first, minimal implementation**: it registers one
-project and is not yet a general project lifecycle manager.
+Adds the repository at `<repo-url>` to the enclosing workspace as a project.
+This is the **first, minimal implementation**: it registers one root-module
+Go project and is not yet a general project lifecycle manager. `za` neither
+knows nor changes a repository's visibility; it registers whatever URL you
+pass.
 
 ```bash
 za project add https://github.com/tnotstar/go-za.git
@@ -143,15 +148,17 @@ fails. There is no `--name`, `--branch` or `--force` yet.
 - Run it from the workspace root or any directory below it. The nearest
   `za.toml` above the current directory identifies the workspace; `go.work`,
   `.agents/` or `.git/` alone never do.
-- `za.toml` must have `schema = 1` and `workspace.go = true`. Only **Go**
+- `za.toml` must have `schema = 3` and `workspace.go = true`. Only **Go**
   projects are supported, and the module must be at the repository root
   (`<project-id>/go.mod`). Repositories with nested modules only are rejected.
 - The workspace must be the top level of a Git working tree with at least
   one commit (commit the `za init` bootstrap first) and **no staged, unstaged
   or untracked changes**. `za` never stashes, discards or commits for you.
-- `<project-id>/`, `.agents/context/projects/<project-id>/`,
+- `<project-id>/`, `.agents/context/<project-id>/`,
   `.worktrees/<project-id>/` and a `.gitmodules` entry with that name or path
-  must not exist yet.
+  must not exist yet. Project IDs must not collide with reserved workspace or
+  context names, including case-equivalent variants (so `issues`,
+  `templates`, `policy.md` or `Policy.md` are all rejected).
 - `git` and `go` must be in `PATH`.
 
 ### What it does
@@ -167,12 +174,15 @@ GOWORK=<workspace>/go.work go work use ./<project-id>
    or `go get`, and never builds or tests the project.
 3. Adds the module to the root `go.work` with `go work use`. The Go toolchain
    owns the result, for example an updated `go` directive.
-4. Creates the private context `.agents/context/projects/<project-id>/` from
-   the workspace's own templates in `.agents/context/_global/templates/project/`,
-   with an empty `decisions/`. Only known facts are filled in: the project ID
-   and paths, Go as language, the root `go.work` membership, the bootstrap
-   phase and the exact gitlink SHA in `status.md`. Everything else stays a
-   `<discover: ...>` or `<decide: ...>` placeholder; no constraints or ADRs
+4. Creates the private context `.agents/context/<project-id>/` from the
+   workspace's own templates in `.agents/context/templates/project/`, with an
+   empty `decisions/`. Only known facts are filled in: the project ID and
+   paths, Go as language, the root `go.work` membership, the bootstrap phase,
+   the date the pin was observed and the exact gitlink SHA as `Pinned
+   gitlink` in `status.md`. Registering does **not** mark the context as
+   verified: `status.md` records `Context verified: pending` until someone
+   actually reviews the context against that revision. Everything else stays
+   a `<discover: ...>` or `<decide: ...>` placeholder; no constraints or ADRs
    are invented.
 5. Adds the project route to the region between `<!-- za:projects:start -->`
    and `<!-- za:projects:end -->` in `AGENTS.md`, sorted by project ID. The
@@ -182,17 +192,17 @@ GOWORK=<workspace>/go.work go work use ./<project-id>
    `go.work.sum` if Go creates it, `AGENTS.md` and the new context) and
    **never commits**. Review them with `git diff --cached`.
 
-`za project add` **never writes to the public project**. If the repository
-has no `openspec/` yet, the command still succeeds: the private context marks
-the functional specification as *OpenSpec bootstrap pending* instead of
-creating `openspec/` or a private substitute for it.
+`za project add` **never writes to the project repository**. OpenSpec is
+optional: if `<project-id>/openspec/` exists, the private context records it
+as a *detected* requirement authority to confirm, not as accepted fact; if
+not, the requirement authority is recorded as `unresolved`. Either way the
+command never creates `openspec/` or a private substitute specification.
 
 `za.toml` is not modified. Project membership lives in `.gitmodules`,
-`go.work`, `.agents/context/projects/` and the `AGENTS.md` routing region.
+`go.work`, `.agents/context/<project-id>/` and the `AGENTS.md` routing region.
 
 Only Git contacts the repository, using your normal Git configuration and
-credentials. `za` cannot prove that a repository is public; it assumes the
-URL you pass is appropriate for a public project.
+credentials.
 
 ### Failure and rollback
 
@@ -211,7 +221,7 @@ invalid usage.
 ```text
 <workspace>/
 ├── .git/                    git init
-├── za.toml                  za workspace manifest
+├── za.toml                  za workspace manifest (schema = 3)
 ├── .gitignore               ignores .worktrees/, .agents/runtime/, .venv/
 ├── .gitattributes           LF line endings
 ├── .editorconfig
@@ -221,19 +231,25 @@ invalid usage.
 ├── pyproject.toml           --python only, written by uv, then extended
 ├── .agents/
 │   ├── context/
-│   │   ├── _global/         GLOBAL context: policy, principles, tooling,
-│   │   │   │                roles, glossary, go/python standards
-│   │   │   └── templates/project/   PROJECT context templates
-│   │   └── projects/        PROJECT contexts (empty until projects exist)
+│   │   ├── INDEX.md         context router (GLOBAL ↔ PROJECT ↔ issues)
+│   │   ├── policy.md        GLOBAL context: policy, principles, tooling,
+│   │   │                    roles, glossary, go/python standards
+│   │   ├── templates/project/   PROJECT context templates
+│   │   ├── templates/issue.md   issue template (issue commands come later)
+│   │   └── <project-id>/    PROJECT contexts (created by za project add)
 │   ├── hooks/{meta,public}/ reserved for future hook management
 │   └── runtime/             local, ignored
 └── .worktrees/              local, ignored
 ```
 
-The context has exactly two levels. GLOBAL context under `_global/` is shared
-by all projects. PROJECT context under `projects/<id>/` is private to one
-project and inherits from GLOBAL. Language standards are generated only for
-the languages you select.
+The context has exactly two levels, both direct children of
+`.agents/context/`: GLOBAL context files, shared by all projects, and
+PROJECT context under `<project-id>/`, private to one project and inheriting
+from GLOBAL. `.agents/context/INDEX.md` is the router between them; it never
+duplicates the project list (that is derived from `.gitmodules`) and never
+embeds issue bodies. Language standards are generated only for the languages
+you select. Project IDs must not collide with context infrastructure names;
+`za project add` rejects reserved names and case-equivalent collisions.
 
 > **`.worktrees/` is ignored for hygiene, not confidentiality.** Private
 > context stays private because it lives in the private meta-repository,
@@ -246,7 +262,7 @@ Every initialized workspace has a `za.toml` at its root. `za` writes it, and it
 is tracked in the meta-repository:
 
 ```toml
-schema = 1
+schema = 3
 
 [workspace]
 go = true
@@ -267,6 +283,41 @@ truth.
 In `AGENTS.md`, the region between `<!-- za:projects:start -->` and
 `<!-- za:projects:end -->` is maintained by `za project add`. Keep your own
 edits outside it.
+
+### Schemas and compatibility
+
+Schema 3 is the flat context layout: GLOBAL files and project context
+directories are direct children of `.agents/context/`, `.agents/context/INDEX.md`
+routes between them, OpenSpec is optional per project, and requirement
+authorities are explicit. Earlier schemas described different layouts:
+
+| Schema | Layout |
+|---|---|
+| 1 | Nested `.agents/context/_global/` and `.agents/context/projects/` (previous releases of `za`) |
+| 2 | Flat layout with mandatory OpenSpec assumptions (a designed intermediate, never shipped) |
+| 3 | Flat layout, optional OpenSpec, explicit requirement authority, reserved issue namespace |
+
+**There is no migration.** This version of `za` refuses to mutate schema-1 or
+schema-2 workspaces: every command that reads `za.toml` rejects unsupported
+schemas instead of guessing, and never partially flattens an old workspace as
+a side effect.
+
+- **Disposable workspaces** (test scaffolds, empty bootstraps) can simply be
+  deleted and recreated with `za init`.
+- **Workspaces holding valuable context** — authored GLOBAL topics, project
+  context, decisions — should be preserved as they are until a controlled
+  transfer or migration exists that can carry that knowledge and Git state
+  over explicitly. Keep using the `za` version that created them for any
+  mutation; a future migration must preflight collisions and preserve
+  user-authored content, and none is specified today.
+
+Changing only the `schema` line of an existing workspace is **not** a
+migration and remains unsupported — it makes the workspace claim a layout it
+does not have, and commands will fail on the missing structure (for example
+the context templates or `INDEX.md`).
+
+Older `za` binaries likewise reject schema-3 manifests as unsupported instead
+of partially handling them.
 
 ## Development
 

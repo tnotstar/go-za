@@ -12,8 +12,7 @@ Summary: Exact supported entry points for agents. Prefer project-owned scripts, 
 | Integration tests | `<discover: command>` | <discover: meta root or active root> | workspace | |
 | Lint | `<discover: command>` | active project root | standalone | |
 | Generate | `<discover: command>` | active project root | standalone | |
-| OpenSpec validation | `<discover: command>` | active project root | standalone | |
-| Release | `<discover: command>` | canonical/public project | standalone | Human approval: <decide: yes/no> |
+| Release | `<discover: command>` | canonical project checkout | standalone | Human approval: <decide: yes/no> |
 
 ## Required capabilities
 

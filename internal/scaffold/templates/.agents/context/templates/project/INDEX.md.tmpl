@@ -1,0 +1,41 @@
+# Project Context: <project-id>
+
+Summary: <decide: one sentence describing this project's responsibility>
+
+- Canonical checkout: `<project-id>/`
+- Private context: `.agents/context/<project-id>/`
+- Task worktrees: `.worktrees/<project-id>/<task-id>/`
+- Language/runtime: <discover: go | python-uv | mixed | other>
+- Canonical workspace participation: <decide: go | uv | both | none>
+- Requirement authority: <discover: behavior authority>
+- Tracking branch: read `submodule.<project-id>.branch` from `.gitmodules`
+
+## Read map
+
+| Need | Read | Trigger |
+|---|---|---|
+| Build/test/lint/generate/release | `tools.md` | Before invoking project commands |
+| Hard architecture rules | `constraints.md` | Before modifying code/design |
+| Existing technical decision | `decisions/` | Only when the task touches that decision |
+| Authority for behavior and contracts | `source-of-truth.md` | Before behavior or contract work |
+| Assigned issue | `issues/` | When the task names an issue |
+| Current work / known blockers | `status.md` | Continuing or coordinating in-flight work |
+
+## Freshness gate
+
+Before modifying this project, confirm that these revisions agree:
+
+- the pinned gitlink (`git ls-files -s <project-id>`);
+- the canonical checkout `HEAD`;
+- the fetched upstream tracking branch.
+
+Then read the context verification record in `status.md`. A pin that has not been reviewed leaves the context unverified; say so instead of claiming currency.
+
+## Stop condition
+
+Stop loading context when you can identify:
+
+1. the authoritative requirement, issue or change;
+2. every applicable MUST constraint;
+3. the validation commands and validation mode;
+4. the specific implementation/test area to inspect next.

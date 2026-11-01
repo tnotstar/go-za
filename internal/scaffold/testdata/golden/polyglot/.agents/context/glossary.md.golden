@@ -1,0 +1,24 @@
+# Glossary
+
+Summary: Cross-project vocabulary established by the workspace architecture. Project or domain terms belong in project context or the project's declared requirement authority, not here.
+
+| Term | Definition |
+|---|---|
+| Meta-repository | This private Git repository: the workspace root holding private context, integration workspace files and the project repositories as submodules. |
+| Project | An independent repository mounted as a top-level Git submodule. Its ID, submodule name and directory name are identical. Registration does not determine its visibility. |
+| GLOBAL context | The shared context level: direct files under `.agents/context/`, inherited by every project. |
+| PROJECT context | The private context of one project, under `.agents/context/<id>/`, inheriting from GLOBAL. |
+| Requirement authority | The single source declared authoritative for a requirement scope; recorded in the project's `source-of-truth.md`. OpenSpec, a tracker, or a private specification, per scope. |
+| Issue | One Markdown record of a change, problem or investigation, under `.agents/context/<id>/issues/` for a project or `.agents/context/issues/` for workspace coordination. |
+| MUST | A global invariant that no project or ADR can weaken. |
+| DEFAULT | A global rule inherited unless a project explicitly replaces it. |
+| Pinned SHA (gitlink) | The submodule commit recorded by the meta-repository for a project. |
+| Canonical checkout | The submodule checkout at `<id>/`, at the pinned gitlink; the reproducible baseline. |
+| Verified SHA | The revision against which a project's private context was last reviewed, recorded in `status.md`. Distinct from the pinned SHA: observing a pin never marks context verified. |
+| Drift | Any disagreement between the pinned gitlink, the canonical checkout `HEAD`, the upstream tracking branch and the verified SHA. |
+| Task worktree | A linked Git worktree of one project at `.worktrees/<id>/<task-id>/`: local, ephemeral execution state. |
+| Integration workspace | The private root Go and/or uv workspace joining canonical checkouts for cross-project work. |
+| Standalone validation | Validating a project exactly as if it were cloned independently, without the private workspace. |
+| Workspace validation | Validating with the private integration workspace intentionally active. |
+| OpenSpec | An optional public functional specification under `<id>/openspec/`, adopted per project; one possible requirement authority. |
+| ADR | Architecture Decision Record: a private project decision under `.agents/context/<id>/decisions/`. |

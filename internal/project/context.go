@@ -11,10 +11,11 @@ import (
 )
 
 // Workspace-relative locations of the project templates written by za init
-// and of the private project contexts instantiated from them.
+// and of the private project contexts instantiated from them. Under the flat
+// schema-3 layout both live directly under .agents/context/.
 const (
-	templateDir = ".agents/context/_global/templates/project"
-	contextDir  = ".agents/context/projects"
+	templateDir = ".agents/context/templates/project"
+	contextDir  = ".agents/context"
 )
 
 // contextFiles are the templates instantiated for every project. The ADR
@@ -80,48 +81,56 @@ func renderContext(templates map[string][]byte, f facts) (map[string][]byte, err
 
 func contextEdits(f facts) []edit {
 	id := f.ID
-	openspec := "`" + id + "/openspec/`"
-	pending := "OpenSpec bootstrap pending (" + openspec + " does not exist yet)"
-	goSum := "`" + id + "/go.sum`"
-	if !f.GoSum {
-		goSum = "not applicable"
+	goSum := "not applicable"
+	if f.GoSum {
+		goSum = "`" + id + "/go.sum`"
+	}
+
+	// OpenSpec is optional and its existence does not make it authoritative:
+	// detection is recorded as a candidate, never as accepted authority.
+	behaviorAuthority, behaviorCurrent, behaviorProposed := "unresolved", "unresolved", "no active change recorded"
+	openSpecRow := "| OpenSpec | no | not adopted |"
+	if f.OpenSpec {
+		behaviorAuthority = "OpenSpec (detected; confirm authority)"
+		behaviorCurrent = "`" + id + "/openspec/specs/`"
+		behaviorProposed = "`" + id + "/openspec/changes/`"
+		openSpecRow = "| OpenSpec | yes | <discover: CLI / agent skill> |"
 	}
 
 	edits := []edit{
 		{"INDEX.md", "- Language/runtime: <discover: go | python-uv | mixed | other>", "- Language/runtime: go"},
 		{"INDEX.md", "- Canonical workspace participation: <decide: go | uv | both | none>", "- Canonical workspace participation: go"},
+		{"INDEX.md", "- Requirement authority: <discover: behavior authority>",
+			"- Requirement authority: " + behaviorAuthority},
 
-		{"source-of-truth.md",
-			"| Go dependencies | <discover: `" + id + "/go.mod` or not applicable> | Public | `" + id + "/go.sum` |",
-			"| Go dependencies | `" + id + "/go.mod` | Public | " + goSum + " |"},
+		{"source-of-truth.md", "<discover: current behavior authority>", behaviorAuthority},
+		{"source-of-truth.md", "<discover: current behavior location>", behaviorCurrent},
+		{"source-of-truth.md", "<discover: proposed behavior authority>", behaviorAuthority},
+		{"source-of-truth.md", "<discover: proposed behavior location>", behaviorProposed},
+		{"source-of-truth.md", "<discover: `" + id + "/go.sum` or not applicable>", goSum},
 		{"source-of-truth.md", "<discover: `/go.work` or not applicable>", "`/go.work`"},
 
 		{"tools.md",
 			"| Go | <discover: yes/no> | <discover: version source and invocation> |",
 			"| Go | yes | version source `" + id + "/go.mod`; <discover: invocation> |"},
-
-		{"status.md", "- Phase: <decide: bootstrap | active-development | maintenance>", "- Phase: bootstrap"},
-		{"status.md", "- Last verified: YYYY-MM-DD", "- Last verified: " + f.Date},
-		{"status.md", "- Verified against gitlink: `<full-submodule-SHA>`", "- Verified against gitlink: `" + f.Gitlink + "`"},
+		{"tools.md",
+			"| OpenSpec | <discover: yes/no> | <discover: CLI / agent skill / not adopted> |",
+			openSpecRow},
 	}
 
-	issues := []string{"- Context bootstrap incomplete: `tools.md`, `constraints.md` and `source-of-truth.md` still hold discovery and decision placeholders."}
-	steps := []string{
-		"- Resolve the placeholders in `tools.md` and `source-of-truth.md` from the public repository.",
-		"- Record only real, verifiable rules in `constraints.md`.",
-	}
-	if !f.OpenSpec {
-		issues = append([]string{"- " + pending + "."}, issues...)
-		steps = append([]string{"- Bootstrap OpenSpec in the public repository at " + openspec + "."}, steps...)
-		edits = append(edits,
-			edit{"INDEX.md", "- Public OpenSpec: " + openspec + "\n", "- Public OpenSpec: " + pending + "; never substitute private context for it\n"},
-			edit{"source-of-truth.md", "| Current observable behavior | `" + id + "/openspec/specs/` |", "| Current observable behavior | " + pending + " |"},
-			edit{"source-of-truth.md", "| Proposed behavior | `" + id + "/openspec/changes/<change>/` |", "| Proposed behavior | " + pending + " |"},
-		)
-	}
 	edits = append(edits,
-		edit{"status.md", "## Known issues\n\n- none\n", "## Known issues\n\n" + strings.Join(issues, "\n") + "\n"},
-		edit{"status.md", "- <decide: at most three concrete items>", strings.Join(steps, "\n")},
+		edit{"status.md", "- Phase: <decide: bootstrap | active-development | maintenance>", "- Phase: bootstrap"},
+		edit{"status.md", "- Pin observed: YYYY-MM-DD", "- Pin observed: " + f.Date},
+		edit{"status.md", "- Pinned gitlink: `<full-submodule-SHA>`", "- Pinned gitlink: `" + f.Gitlink + "`"},
+		edit{"status.md", "## Known issues\n\n- none\n", "## Known issues\n\n" + strings.Join([]string{
+			"- Context bootstrap incomplete: `tools.md`, `constraints.md` and `source-of-truth.md` still hold discovery and decision placeholders.",
+			"- Context verification is pending: the recorded pin has not been reviewed.",
+		}, "\n") + "\n"},
+		edit{"status.md", "- <decide: at most three concrete items>", strings.Join([]string{
+			"- Resolve the placeholders in `tools.md` and `source-of-truth.md` from the project repository.",
+			"- Declare the requirement authority for observable behavior in `source-of-truth.md`.",
+			"- Record only real, verifiable rules in `constraints.md`.",
+		}, "\n")},
 	)
 	return edits
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -37,9 +38,9 @@ type Result struct {
 
 // Summary renders the success report.
 func (r Result) Summary() string {
-	openspec := "bootstrap pending"
+	authority := "unresolved (no OpenSpec detected)"
 	if r.OpenSpec {
-		openspec = r.ID + "/openspec/"
+		authority = r.ID + "/openspec/ (detected; confirm authority)"
 	}
 	module := "added to go.work"
 	if r.Module != "" {
@@ -50,11 +51,11 @@ func (r Result) Summary() string {
   Project:    %s/
   Context:    %s/%s/
   Go module:  %s
-  OpenSpec:   %s
-  Gitlink:    %s
+  Requirement authority: %s
+  Pinned gitlink: %s (context verification pending)
 
 Changes are staged but not committed.
-`, r.ID, r.URL, r.ID, contextDir, r.ID, module, openspec, r.Gitlink)
+`, r.ID, r.URL, r.ID, contextDir, r.ID, module, authority, r.Gitlink)
 }
 
 // Add registers repoURL as a top-level Git submodule of the enclosing za
@@ -265,6 +266,33 @@ func (a *adder) preflightPaths() error {
 		}
 		if ok {
 			return fmt.Errorf("cannot add project %q: %s already exists", a.id, rel)
+		}
+	}
+	return a.preflightCaseCollisions()
+}
+
+// preflightCaseCollisions rejects a project ID that differs only by case from
+// an existing top-level entry or direct child of the context directory. On a
+// case-insensitive filesystem such a name would collide with, or overwrite,
+// the existing entry; the namespace also stays unambiguous on every platform.
+func (a *adder) preflightCaseCollisions() error {
+	dirs := []string{a.root, filepath.Join(a.root, filepath.FromSlash(contextDir))}
+	for _, dir := range dirs {
+		des, err := os.ReadDir(dir)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("list %s: %w", dir, err)
+		}
+		for _, de := range des {
+			if strings.EqualFold(de.Name(), a.id) {
+				rel, rerr := filepath.Rel(a.root, filepath.Join(dir, de.Name()))
+				if rerr != nil {
+					return rerr
+				}
+				return fmt.Errorf("cannot add project %q: %s already exists (case-insensitive collision)", a.id, filepath.ToSlash(rel))
+			}
 		}
 	}
 	return nil

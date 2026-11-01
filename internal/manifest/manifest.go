@@ -1,9 +1,12 @@
 // Package manifest locates and reads za.toml, the za workspace manifest.
 //
-// Only schema 1 exists. The parser accepts exactly the TOML subset that
-// schema 1 needs: comments, blank lines, the [workspace] table header and
+// Only schema 3 exists: the flat context layout with a context-root
+// INDEX.md router. The parser accepts exactly the TOML subset that
+// schema 3 needs: comments, blank lines, the [workspace] table header and
 // bare keys with integer or boolean values. Anything else, including unknown
-// keys and duplicates, is rejected rather than guessed at.
+// keys and duplicates, is rejected rather than guessed at. Schemas 1 and 2
+// describe different, older layouts; they are rejected fail-closed, and no
+// migration exists.
 package manifest
 
 import (
@@ -22,12 +25,12 @@ import (
 const FileName = "za.toml"
 
 // SupportedSchema is the only workspace schema this za version understands.
-const SupportedSchema = 1
+const SupportedSchema = 3
 
 // ErrNotFound reports that no za.toml encloses the starting directory.
 var ErrNotFound = errors.New("not inside a za workspace")
 
-// Manifest is the typed content of a schema 1 za.toml.
+// Manifest is the typed content of a schema 3 za.toml.
 type Manifest struct {
 	Schema    int
 	Workspace Workspace
@@ -80,7 +83,7 @@ func Load(root string) (Manifest, error) {
 	return m, nil
 }
 
-// Parse parses a schema 1 manifest.
+// Parse parses a schema 3 manifest.
 func Parse(data []byte) (Manifest, error) {
 	m, seen, err := parseLines(data)
 	if err != nil {
@@ -175,10 +178,10 @@ type UnsupportedSchemaError struct {
 }
 
 func (e *UnsupportedSchemaError) Error() string {
-	return fmt.Sprintf("unsupported za workspace schema: %d", e.Schema)
+	return fmt.Sprintf("unsupported za workspace schema: %d (this za version supports schema %d only; there is no migration)", e.Schema, SupportedSchema)
 }
 
-// stripComment removes a trailing comment. Schema 1 has no string values, so
+// stripComment removes a trailing comment. Schema 3 has no string values, so
 // "#" never appears inside a value.
 func stripComment(line string) string {
 	before, _, _ := strings.Cut(line, "#")

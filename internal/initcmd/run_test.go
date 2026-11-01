@@ -49,18 +49,19 @@ var commonPaths = []string{
 	"AGENTS.md",
 	"CLAUDE.md",
 	"za.toml",
-	".agents/context/_global/policy.md",
-	".agents/context/_global/principles.md",
-	".agents/context/_global/tooling.md",
-	".agents/context/_global/roles.md",
-	".agents/context/_global/glossary.md",
-	".agents/context/_global/templates/project/INDEX.md",
-	".agents/context/_global/templates/project/tools.md",
-	".agents/context/_global/templates/project/constraints.md",
-	".agents/context/_global/templates/project/source-of-truth.md",
-	".agents/context/_global/templates/project/status.md",
-	".agents/context/_global/templates/project/adr.md",
-	".agents/context/projects",
+	".agents/context/INDEX.md",
+	".agents/context/policy.md",
+	".agents/context/principles.md",
+	".agents/context/tooling.md",
+	".agents/context/roles.md",
+	".agents/context/glossary.md",
+	".agents/context/templates/issue.md",
+	".agents/context/templates/project/INDEX.md",
+	".agents/context/templates/project/tools.md",
+	".agents/context/templates/project/constraints.md",
+	".agents/context/templates/project/source-of-truth.md",
+	".agents/context/templates/project/status.md",
+	".agents/context/templates/project/adr.md",
 	".agents/hooks/meta",
 	".agents/hooks/public",
 	".agents/runtime",
@@ -77,22 +78,22 @@ func TestRunModes(t *testing.T) {
 		{
 			name:    "go only",
 			opts:    Options{Go: true},
-			present: []string{"go.work", ".agents/context/_global/go-standards.md"},
-			absent:  []string{"pyproject.toml", ".agents/context/_global/python-standards.md"},
+			present: []string{"go.work", ".agents/context/go-standards.md"},
+			absent:  []string{"pyproject.toml", ".agents/context/python-standards.md"},
 		},
 		{
 			name:    "python only",
 			opts:    Options{Python: true},
-			present: []string{"pyproject.toml", ".agents/context/_global/python-standards.md"},
-			absent:  []string{"go.work", ".agents/context/_global/go-standards.md"},
+			present: []string{"pyproject.toml", ".agents/context/python-standards.md"},
+			absent:  []string{"go.work", ".agents/context/go-standards.md"},
 		},
 		{
 			name: "polyglot",
 			opts: Options{Go: true, Python: true},
 			present: []string{
 				"go.work", "pyproject.toml",
-				".agents/context/_global/go-standards.md",
-				".agents/context/_global/python-standards.md",
+				".agents/context/go-standards.md",
+				".agents/context/python-standards.md",
 			},
 		},
 	}
@@ -119,19 +120,27 @@ func TestRunModes(t *testing.T) {
 					t.Errorf("unexpected %s", p)
 				}
 			}
-			for _, p := range []string{"go.work.sum", "uv.lock", ".gitmodules", "openspec", ".agents/bin", ".agents/runtime/.gitkeep", ".worktrees/.gitkeep", ".agents/za.toml"} {
+			for _, p := range []string{"go.work.sum", "uv.lock", ".gitmodules", "openspec", ".agents/bin", ".agents/runtime/.gitkeep", ".worktrees/.gitkeep", ".agents/za.toml", ".agents/context/projects", ".agents/context/_global"} {
 				if exists(t, filepath.Join(root, filepath.FromSlash(p))) {
 					t.Errorf("za must not create %s", p)
 				}
 			}
-			if got := entries(t, filepath.Join(root, ".agents/context/projects")); !slices.Equal(got, []string{".gitkeep"}) {
-				t.Errorf(".agents/context/projects contains %v, want only .gitkeep", got)
+			wantContext := []string{"INDEX.md", "policy.md", "principles.md", "roles.md", "tooling.md", "glossary.md", "templates"}
+			if tt.opts.Go {
+				wantContext = append(wantContext, "go-standards.md")
+			}
+			if tt.opts.Python {
+				wantContext = append(wantContext, "python-standards.md")
+			}
+			slices.Sort(wantContext)
+			if got := entries(t, filepath.Join(root, ".agents/context")); !slices.Equal(got, wantContext) {
+				t.Errorf(".agents/context contains %v, want %v", got, wantContext)
 			}
 			manifest, err := os.ReadFile(filepath.Join(root, "za.toml"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := fmt.Sprintf("schema = 1\n\n[workspace]\ngo = %t\npython = %t\n", tt.opts.Go, tt.opts.Python)
+			want := fmt.Sprintf("schema = 3\n\n[workspace]\ngo = %t\npython = %t\n", tt.opts.Go, tt.opts.Python)
 			if string(manifest) != want {
 				t.Errorf("za.toml =\n%s\nwant\n%s", manifest, want)
 			}

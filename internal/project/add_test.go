@@ -182,7 +182,7 @@ type state struct {
 	files                   map[string]string
 }
 
-var trackedFiles = []string{"AGENTS.md", "go.work", "za.toml"}
+var trackedFiles = []string{"AGENTS.md", "go.work", "za.toml", ".agents/context/INDEX.md"}
 
 func capture(t *testing.T, root string) state {
 	t.Helper()
@@ -222,7 +222,7 @@ func assertRestored(t *testing.T, root, id string, before state) {
 			t.Errorf("%s left behind", rel)
 		}
 	}
-	for _, rel := range []string{id, ".agents/context/projects/" + id, ".git/modules/" + id} {
+	for _, rel := range []string{id, ".agents/context/" + id, ".git/modules/" + id} {
 		if present(t, filepath.Join(root, rel)) {
 			t.Errorf("%s left behind", rel)
 		}
@@ -231,7 +231,7 @@ func assertRestored(t *testing.T, root, id string, before state) {
 
 func TestAddRealGitSuccess(t *testing.T) {
 	hermetic(t)
-	for _, variant := range []string{"openspec-pending", "openspec-present"} {
+	for _, variant := range []string{"openspec-absent", "openspec-present"} {
 		t.Run(variant, func(t *testing.T) {
 			files := goRepo
 			if variant == "openspec-present" {
@@ -253,10 +253,17 @@ func TestAddRealGitSuccess(t *testing.T) {
 				t.Errorf("unexpected result %+v (public HEAD %s)", res, pubHead)
 			}
 			summary := res.Summary()
-			for _, want := range []string{`Added project "pub"`, "Project:    pub/", "Gitlink:    " + pubHead, "staged but not committed"} {
+			for _, want := range []string{`Added project "pub"`, "Project:    pub/", "Pinned gitlink: " + pubHead, "context verification pending", "staged but not committed"} {
 				if !strings.Contains(summary, want) {
 					t.Errorf("summary lacks %q:\n%s", want, summary)
 				}
+			}
+			wantAuthority := "Requirement authority: unresolved (no OpenSpec detected)"
+			if variant == "openspec-present" {
+				wantAuthority = "Requirement authority: pub/openspec/ (detected; confirm authority)"
+			}
+			if !strings.Contains(summary, wantAuthority) {
+				t.Errorf("summary lacks %q:\n%s", wantAuthority, summary)
 			}
 
 			// Native commands, run directly from the workspace root.
@@ -286,12 +293,12 @@ func TestAddRealGitSuccess(t *testing.T) {
 			}
 			staged := strings.Fields(git(t, root, "diff", "--cached", "--name-only"))
 			wantStaged := []string{
-				".agents/context/projects/pub/INDEX.md",
-				".agents/context/projects/pub/constraints.md",
-				".agents/context/projects/pub/decisions/.gitkeep",
-				".agents/context/projects/pub/source-of-truth.md",
-				".agents/context/projects/pub/status.md",
-				".agents/context/projects/pub/tools.md",
+				".agents/context/pub/INDEX.md",
+				".agents/context/pub/constraints.md",
+				".agents/context/pub/decisions/.gitkeep",
+				".agents/context/pub/source-of-truth.md",
+				".agents/context/pub/status.md",
+				".agents/context/pub/tools.md",
 				".gitmodules", "AGENTS.md", "go.work", "pub",
 			}
 			if !slices.Equal(staged, wantStaged) {
@@ -319,13 +326,18 @@ func TestAddRealGitSuccess(t *testing.T) {
 			if err != nil || readFile(t, filepath.Join(root, "AGENTS.md")) != string(wantAgents) {
 				t.Errorf("AGENTS.md is not the original with only the route added (%v)", err)
 			}
-			if variant == "openspec-pending" && present(t, filepath.Join(root, "pub", "openspec")) {
+			// The context-root index routes deterministically and holds no
+			// per-project entries, so registration must not touch it.
+			if got := readFile(t, filepath.Join(root, ".agents", "context", "INDEX.md")); got != before.files[".agents/context/INDEX.md"] {
+				t.Errorf("context-root INDEX.md was modified by registration:\n%s", got)
+			}
+			if variant == "openspec-absent" && present(t, filepath.Join(root, "pub", "openspec")) {
 				t.Error("openspec/ was created in the public project")
 			}
 
 			// Private context, compared against golden files with the
 			// variable gitlink masked.
-			ctxDir := filepath.Join(root, ".agents", "context", "projects", "pub")
+			ctxDir := filepath.Join(root, ".agents", "context", "pub")
 			if des, err := os.ReadDir(filepath.Join(ctxDir, "decisions")); err != nil || len(des) != 1 || des[0].Name() != ".gitkeep" {
 				t.Errorf("decisions/ must hold only .gitkeep: %v %v", des, err)
 			}
@@ -341,11 +353,30 @@ func TestAddRealGitSuccess(t *testing.T) {
 				}
 			}
 			status := readFile(t, filepath.Join(ctxDir, "status.md"))
-			if !strings.Contains(status, "- Verified against gitlink: `"+pubHead+"`") {
-				t.Errorf("status.md lacks the gitlink:\n%s", status)
+			if !strings.Contains(status, "- Pinned gitlink: `"+pubHead+"`") {
+				t.Errorf("status.md lacks the pinned gitlink:\n%s", status)
 			}
-			if pending := strings.Contains(status, "OpenSpec bootstrap pending"); pending != (variant == "openspec-pending") {
-				t.Errorf("status.md bootstrap-pending marker = %t:\n%s", pending, status)
+			if !strings.Contains(status, "- Context verified: pending (registration observed the pin; no review has confirmed it)") {
+				t.Errorf("status.md does not mark context verification pending:\n%s", status)
+			}
+			if strings.Contains(status, "OpenSpec bootstrap pending") {
+				t.Errorf("status.md uses the retired OpenSpec-pending convention:\n%s", status)
+			}
+			sot := readFile(t, filepath.Join(ctxDir, "source-of-truth.md"))
+			wantSotAuthority := "unresolved"
+			if variant == "openspec-present" {
+				wantSotAuthority = "OpenSpec (detected; confirm authority)"
+			}
+			if !strings.Contains(sot, wantSotAuthority) {
+				t.Errorf("source-of-truth.md lacks %q:\n%s", wantSotAuthority, sot)
+			}
+			tools := readFile(t, filepath.Join(ctxDir, "tools.md"))
+			wantOpenSpecRow := "| OpenSpec | no | not adopted |"
+			if variant == "openspec-present" {
+				wantOpenSpecRow = "| OpenSpec | yes | <discover: CLI / agent skill> |"
+			}
+			if !strings.Contains(tools, wantOpenSpecRow) {
+				t.Errorf("tools.md OpenSpec row = want %q:\n%s", wantOpenSpecRow, tools)
 			}
 		})
 	}
@@ -507,10 +538,23 @@ func TestAddRealGitPreflight(t *testing.T) {
 			git(t, root, "commit", "--quiet", "-m", "pub dir")
 		}, err: "pub already exists"},
 		{name: "private context exists", commit: true, setup: func(t *testing.T, root string) {
-			writeFile(t, filepath.Join(root, ".agents", "context", "projects", "pub", "INDEX.md"), "x\n")
+			writeFile(t, filepath.Join(root, ".agents", "context", "pub", "INDEX.md"), "x\n")
 			git(t, root, "add", "--all")
 			git(t, root, "commit", "--quiet", "-m", "ctx")
-		}, err: ".agents/context/projects/pub already exists"},
+		}, err: ".agents/context/pub already exists"},
+		{name: "context case collision", commit: true, setup: func(t *testing.T, root string) {
+			if err := os.Mkdir(filepath.Join(root, ".agents", "context", "Pub"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writeFile(t, filepath.Join(root, ".agents", "context", "Pub", "INDEX.md"), "x\n")
+			git(t, root, "add", "--all")
+			git(t, root, "commit", "--quiet", "-m", "ctx")
+		}, err: `cannot add project "pub": .agents/context/Pub already exists (case-insensitive collision)`},
+		{name: "top-level case collision", commit: true, setup: func(t *testing.T, root string) {
+			writeFile(t, filepath.Join(root, "Pub", "README.md"), "x\n")
+			git(t, root, "add", "--all")
+			git(t, root, "commit", "--quiet", "-m", "pub dir")
+		}, err: `cannot add project "pub": Pub already exists (case-insensitive collision)`},
 		{name: "worktrees exist", commit: true, setup: func(t *testing.T, root string) {
 			if err := os.MkdirAll(filepath.Join(root, ".worktrees", "pub", "task"), 0o755); err != nil {
 				t.Fatal(err)
@@ -539,7 +583,7 @@ func TestAddRealGitPreflight(t *testing.T) {
 			git(t, root, "commit", "--quiet", "-am", "custom")
 		}, err: "missing project routing marker"},
 		{name: "customized template", commit: true, setup: func(t *testing.T, root string) {
-			writeFile(t, filepath.Join(root, ".agents", "context", "_global", "templates", "project", "status.md"), "# Status\n")
+			writeFile(t, filepath.Join(root, ".agents", "context", "templates", "project", "status.md"), "# Status\n")
 			git(t, root, "commit", "--quiet", "-am", "custom")
 		}, err: "does not match the layout generated by za init"},
 		{name: "go.work missing", commit: true, setup: func(t *testing.T, root string) {
@@ -593,7 +637,7 @@ func TestAddRealGitPreflight(t *testing.T) {
 func TestAddNotAGitRepository(t *testing.T) {
 	hermetic(t)
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "za.toml"), "schema = 1\n\n[workspace]\ngo = true\npython = false\n")
+	writeFile(t, filepath.Join(root, "za.toml"), "schema = 3\n\n[workspace]\ngo = true\npython = false\n")
 	// Keep git from discovering an enclosing repository of the temp dir.
 	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
 	rec := &recorder{}
@@ -608,7 +652,7 @@ func TestAddNotAGitRepository(t *testing.T) {
 
 // Fake-runner tests: failures detected before any native command runs.
 func TestAddPreflightWithoutCommands(t *testing.T) {
-	goManifest := "schema = 1\n\n[workspace]\ngo = true\npython = false\n"
+	goManifest := "schema = 3\n\n[workspace]\ngo = true\npython = false\n"
 	tests := []struct {
 		name     string
 		manifest string // empty: no za.toml at all
@@ -617,10 +661,11 @@ func TestAddPreflightWithoutCommands(t *testing.T) {
 		err      string
 	}{
 		{name: "not inside workspace", url: "https://h/o/pub.git", err: "not inside a za workspace"},
-		{name: "malformed manifest", manifest: "schema = 1\n[workspace\n", url: "https://h/o/pub.git", err: "invalid workspace manifest"},
-		{name: "unsupported schema", manifest: "schema = 2\n", url: "https://h/o/pub.git", err: "unsupported za workspace schema: 2"},
-		{name: "missing workspace table", manifest: "schema = 1\n", url: "https://h/o/pub.git", err: "missing [workspace] table"},
-		{name: "go disabled", manifest: "schema = 1\n[workspace]\ngo = false\npython = true\n", url: "https://h/o/pub.git", err: "requires a Go-enabled workspace"},
+		{name: "malformed manifest", manifest: "schema = 3\n[workspace\n", url: "https://h/o/pub.git", err: "invalid workspace manifest"},
+		{name: "unsupported schema 2", manifest: "schema = 2\n", url: "https://h/o/pub.git", err: "unsupported za workspace schema: 2"},
+		{name: "unsupported schema 1", manifest: "schema = 1\n[workspace]\ngo = true\npython = false\n", url: "https://h/o/pub.git", err: "unsupported za workspace schema: 1"},
+		{name: "missing workspace table", manifest: "schema = 3\n", url: "https://h/o/pub.git", err: "missing [workspace] table"},
+		{name: "go disabled", manifest: "schema = 3\n[workspace]\ngo = false\npython = true\n", url: "https://h/o/pub.git", err: "requires a Go-enabled workspace"},
 		{name: "missing git", manifest: goManifest, url: "https://h/o/pub.git", missing: "git", err: `requires executable "git"`},
 		{name: "missing go", manifest: goManifest, url: "https://h/o/pub.git", missing: "go", err: `requires executable "go"`},
 		{name: "invalid project id", manifest: goManifest, url: "https://h/o/..", err: "cannot derive a project ID"},
@@ -655,7 +700,7 @@ func TestAddPreflightWithoutCommands(t *testing.T) {
 
 func TestAddPreflightGitFailureRunsNoMutation(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "za.toml"), "schema = 1\n\n[workspace]\ngo = true\npython = false\n")
+	writeFile(t, filepath.Join(root, "za.toml"), "schema = 3\n\n[workspace]\ngo = true\npython = false\n")
 	f := &tooltest.Fake{Respond: func(c tool.Command) ([]byte, error) {
 		return nil, fmt.Errorf("%s: fatal: not a git repository", c)
 	}}

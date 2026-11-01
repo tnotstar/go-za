@@ -42,7 +42,7 @@ func TestRun(t *testing.T) {
 		{name: "init python", args: []string{"init", "--python", filepath.Join(t.TempDir(), "py")}, code: ExitOK, stdout: "  Go:     disabled\n  Python: enabled"},
 		{name: "help lists project", args: []string{"--help"}, code: ExitOK, stdout: "project  Manage the projects"},
 		{name: "project without command", args: []string{"project"}, code: ExitUsage, stderr: "za project <command>", noCommands: true},
-		{name: "project help", args: []string{"project", "--help"}, code: ExitOK, stdout: "add     Add a public Go repository"},
+		{name: "project help", args: []string{"project", "--help"}, code: ExitOK, stdout: "add     Add a Go repository"},
 		{name: "project unknown command", args: []string{"project", "list"}, code: ExitUsage, stderr: `unknown project command "list"`, noCommands: true},
 		{name: "project add help", args: []string{"project", "add", "--help"}, code: ExitOK, stdout: "za project add <repo-url>"},
 		{name: "project add without url", args: []string{"project", "add"}, code: ExitUsage, stderr: "error: missing repository URL", noCommands: true},

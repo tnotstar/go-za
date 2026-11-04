@@ -163,7 +163,7 @@ handling, dependency wiring) is future work. Registering a project with
 `za project add` does not touch Cargo membership, and `exclude =
 [".worktrees"]` keeps task worktrees out of the integration workspace —
 though exclusion from membership does not isolate ancestor Cargo
-configuration; see `rust-standards.md` in a generated workspace.
+configuration; see `tooling.md` in a generated workspace.
 
 ### Exit status
 
@@ -205,7 +205,7 @@ fails. There is no `--name`, `--branch` or `--force` yet.
 - Run it from the workspace root or any directory below it. The nearest
   `za.toml` above the current directory identifies the workspace; `go.work`,
   `.agents/` or `.git/` alone never do.
-- `za.toml` must have `schema = 3` and `workspace.go = true`. Only **Go**
+- `za.toml` must have `schema = 4` and `workspace.go = true`. Only **Go**
   projects are supported, and the module must be at the repository root
   (`<project-id>/go.mod`). Repositories with nested modules only are rejected.
 - The workspace must be the top level of a Git working tree with at least
@@ -232,15 +232,16 @@ GOWORK=<workspace>/go.work go work use ./<project-id>
 3. Adds the module to the root `go.work` with `go work use`. The Go toolchain
    owns the result, for example an updated `go` directive.
 4. Creates the private context `.agents/context/<project-id>/` from the
-   workspace's own templates in `.agents/context/templates/project/`, with an
-   empty `decisions/`. Only known facts are filled in: the project ID and
-   paths, Go as language, the root `go.work` membership, the bootstrap phase,
-   the date the pin was observed and the exact gitlink SHA as `Pinned
-   gitlink` in `status.md`. Registering does **not** mark the context as
-   verified: `status.md` records `Context verified: pending` until someone
-   actually reviews the context against that revision. Everything else stays
-   a `<discover: ...>` or `<decide: ...>` placeholder; no constraints or ADRs
-   are invented.
+   workspace's own templates in `.agents/context/templates/project/`: the
+   project guide `AGENTS.md`, `sot.md`, `status.md`, `tools.md`, the empty
+   decision register `adr.md`, and an empty `decisions/`. Only known facts
+   are filled in: the project ID and paths, Go as language, the root
+   `go.work` membership, the bootstrap phase, the date the pin was observed
+   and the exact gitlink SHA as `Pinned gitlink` in `status.md`.
+   Registering does **not** mark the context as verified: `status.md`
+   records `Context verified: pending` until someone actually reviews the
+   context against that revision. Everything else stays a `<discover: ...>`
+   or `<decide: ...>` placeholder; no decisions or authorities are invented.
 5. Adds the project route to the region between `<!-- za:projects:start -->`
    and `<!-- za:projects:end -->` in `AGENTS.md`, sorted by project ID. The
    rest of the file is not touched. Missing, duplicated or hand-edited markers
@@ -278,20 +279,20 @@ invalid usage.
 ```text
 <workspace>/
 ├── .git/                    git init
-├── za.toml                  za workspace manifest (schema = 3)
+├── za.toml                  za workspace manifest (schema = 4)
 ├── .gitignore               ignores .worktrees/, .agents/runtime/, .venv/
 ├── .gitattributes           LF line endings
 ├── .editorconfig
-├── AGENTS.md                agent router, with a za-managed project region
+├── AGENTS.md                root agent guide, with a za-managed project region
 ├── CLAUDE.md                points Claude Code to AGENTS.md
 ├── go.work                  --go only, written by the Go toolchain
 ├── pyproject.toml           --python only, written by uv, then extended
 ├── Cargo.toml               --rust only: virtual workspace, no members
 ├── .agents/
 │   ├── context/
-│   │   ├── INDEX.md         context router (GLOBAL ↔ PROJECT ↔ issues)
-│   │   ├── policy.md        GLOBAL context: policy, principles, tooling,
-│   │   │                    roles, glossary, go/python/rust standards
+│   │   ├── AGENTS.md        common guide (routes to mandatory policy and topics)
+│   │   ├── policy.md        COMMON policy: MUST rules for the whole workspace
+│   │   ├── tooling.md       COMMON tooling: integration constraints per capability
 │   │   ├── templates/project/   PROJECT context templates
 │   │   ├── templates/issue.md   issue template (issue commands come later)
 │   │   └── <project-id>/    PROJECT contexts (created by za project add)
@@ -300,14 +301,23 @@ invalid usage.
 └── .worktrees/              local, ignored
 ```
 
-The context has exactly two levels, both direct children of
-`.agents/context/`: GLOBAL context files, shared by all projects, and
-PROJECT context under `<project-id>/`, private to one project and inheriting
-from GLOBAL. `.agents/context/INDEX.md` is the router between them; it never
-duplicates the project list (that is derived from `.gitmodules`) and never
-embeds issue bodies. Language standards are generated only for the languages
-you select (`go-standards.md`, `python-standards.md`, `rust-standards.md`),
-but `rust-standards.md` is a reserved name in every workspace. Project IDs
+The context has two levels in the workspace, both under `.agents/context/`:
+COMMON context (the direct files, owned by the workspace maintainers) and
+PROJECT context under `<project-id>/`. GLOBAL preferences are a third,
+optional level **outside** the workspace: they belong to the user's coding
+tool, and `za` never discovers, provisions or modifies them, never requires
+them (initialization works with an empty user profile), and never copies
+personal preferences into a project.
+
+Three guides serve the routing decisions: the root `AGENTS.md` (which
+repository and task scope?), the common guide `.agents/context/AGENTS.md`
+(which shared rules apply?), and each project's
+`.agents/context/<id>/AGENTS.md` (what authority, commands or decision
+governs this change?). The common guide routes to the mandatory
+`policy.md` and to `tooling.md`, which documents integration behavior only
+for the languages you select. It never duplicates the project list (that is
+derived from `.gitmodules`) and never embeds issue bodies. Leaf collections
+such as issues and decisions are reached by ID or reference. Project IDs
 must not collide with context infrastructure names; `za project add`
 rejects reserved names and case-equivalent collisions.
 
@@ -322,7 +332,7 @@ Every initialized workspace has a `za.toml` at its root. `za` writes it, and it
 is tracked in the meta-repository:
 
 ```toml
-schema = 3
+schema = 4
 
 [workspace]
 go = true
@@ -337,9 +347,9 @@ rust = false
 | `workspace.python` | The workspace was initialized with `--python` |
 | `workspace.rust` | The workspace was initialized with `--rust` |
 
-`za` always writes all three capability booleans. Reading a schema-3
-manifest without `workspace.rust` (written by an earlier schema-3 release)
-means `rust = false`; invalid types are rejected.
+`za` always writes all three capability booleans. Reading an otherwise
+valid schema-4 manifest without `workspace.rust` means `rust = false`;
+invalid types are rejected.
 
 The manifest belongs to `za`, not to the agent context under `.agents/`. It
 only marks the directory as a `za` workspace. Projects, paths and tool
@@ -352,21 +362,24 @@ edits outside it.
 
 ### Schemas and compatibility
 
-Schema 3 is the flat context layout: GLOBAL files and project context
-directories are direct children of `.agents/context/`, `.agents/context/INDEX.md`
-routes between them, OpenSpec is optional per project, and requirement
-authorities are explicit. Earlier schemas described different layouts:
+Schema 4 is the guide-based context layout: the root `AGENTS.md`, the common
+guide `.agents/context/AGENTS.md` and per-project
+`.agents/context/<id>/AGENTS.md` guides route to COMMON policy, project
+authorities (`sot.md`) and the decision register; GLOBAL is an optional,
+user-managed level outside the workspace. Earlier schemas described
+different layouts:
 
 | Schema | Layout |
 |---|---|
 | 1 | Nested `.agents/context/_global/` and `.agents/context/projects/` (previous releases of `za`) |
 | 2 | Flat layout with mandatory OpenSpec assumptions (a designed intermediate, never shipped) |
-| 3 | Flat layout, optional OpenSpec, explicit requirement authority, reserved issue namespace |
+| 3 | Flat layout with a context-root `INDEX.md` router, GLOBAL context files, generated language standards and `source-of-truth.md` |
 
-**There is no migration.** This version of `za` refuses to mutate schema-1 or
-schema-2 workspaces: every command that reads `za.toml` rejects unsupported
-schemas instead of guessing, and never partially flattens an old workspace as
-a side effect.
+**There is no migration.** This version of `za` writes schema-4 workspaces
+only. Every command that reads `za.toml` rejects unsupported schemas,
+including schema 3, before mutating anything, and never flattens or
+rewrites an old workspace as a side effect. Schema-3 workspaces keep
+working with the `za` releases that match their schema.
 
 - **Disposable workspaces** (test scaffolds, empty bootstraps) can simply be
   deleted and recreated with `za init`.
@@ -380,10 +393,12 @@ a side effect.
 Changing only the `schema` line of an existing workspace is **not** a
 migration and remains unsupported — it makes the workspace claim a layout it
 does not have, and commands will fail on the missing structure (for example
-the context templates or `INDEX.md`).
+`sot.md` or the project guide `AGENTS.md`).
 
-Older `za` binaries likewise reject schema-3 manifests as unsupported instead
-of partially handling them. Binaries from before the Rust capability reject a
+`za` binaries and manifests are matched strictly in both directions: this
+version rejects schema-3 workspaces, and older `za` binaries reject
+schema-4 manifests as unsupported instead of partially handling them.
+Binaries from before the Rust capability reject a
 Rust-enabled manifest outright with `unknown key workspace.rust` — they never
 silently ignore the capability or partially apply it. A Rust-enabled
 workspace therefore requires a `za` binary with Rust support; there is no

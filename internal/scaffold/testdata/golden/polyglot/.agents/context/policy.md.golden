@@ -1,11 +1,11 @@
-# Global Policy
+# Workspace Policy
 
-Summary: Non-overridable rules for every project and agent in this workspace.
+Summary: Non-overridable COMMON rules for every project and agent in this workspace.
 
 ## Rule strength
 
-- **MUST** rules are invariants. No project context, constraint or ADR may weaken or override them; projects may only strengthen them.
-- **DEFAULT** rules are inherited unless a project explicitly replaces them, normally through an accepted ADR.
+- **MUST** rules are invariants. No project context, constraint or decision may weaken or override them; projects may only strengthen them.
+- **DEFAULT** rules are inherited unless a project explicitly replaces them, normally through an accepted decision.
 
 Every rule in this file is a MUST.
 
@@ -24,12 +24,12 @@ Every rule in this file is a MUST.
 - P-08 Secret values, credentials, private keys, tokens and passwords are never committed anywhere, in context, issues or project files.
 - P-09 Private context may record secret names, environment-variable names and retrieval procedures, never values.
 
-## Context isolation
+## Context levels
 
-- P-10 Context has exactly two levels: GLOBAL (direct files under `.agents/context/`) and PROJECT (`.agents/context/<id>/`).
-- P-11 Work with one active project unless the task is explicitly multi-project. Multi-project tasks process project contexts sequentially.
-- P-12 A project context is understandable from GLOBAL, that project's private context, that project's repository and its declared authoritative references alone. It never requires, and is never authoritative for, another project.
-- P-13 When switching projects, retain only GLOBAL context and load the new project from zero.
+- P-10 COMMON context is the set of direct files under `.agents/context/`, owned by the workspace maintainers. PROJECT context is `.agents/context/<id>/`. GLOBAL preferences are external to the workspace: optional, owned by the user's coding tool, and never discovered, provisioned or modified by `za` or by agents. Personal preferences are defaults; COMMON boundaries, project formatter settings and CI apply to the work they govern.
+- P-11 Work with one active project unless the task is explicitly multi-project. A multi-project task processes project contexts sequentially and never assumes one project's defaults apply to the next.
+- P-12 A project context is understandable from COMMON, that project's private context, that project's repository and its declared authoritative references alone. It never requires, and is never authoritative for, another project.
+- P-13 When switching projects, retain only COMMON context and load the new project from zero.
 
 ## Execution state
 
@@ -40,10 +40,10 @@ Every rule in this file is a MUST.
 
 ## Authority
 
-- P-18 Every requirement scope has exactly one declared authority, recorded in the project's `source-of-truth.md`. Physical location, format and recency never confer authority by themselves.
+- P-18 Every requirement scope has at most one declared authority, recorded in the project's `sot.md`; a scope needed for implementation must have exactly one. Physical location, format and recency never confer authority by themselves.
 - P-19 Unresolved requirement authority that affects implementation is surfaced before that implementation proceeds, never guessed around.
-- P-20 Observable behavior: the declared authority for the scope (an assigned OpenSpec change, current OpenSpec spec, another tracker, or a privately authoritative specification) > implementation > private notes.
-- P-21 Technical architecture: global MUST > accepted project ADR > global DEFAULT. An ADR never overrides a MUST and never redeclares observable behavior; behavior authority changes go through the declared requirement process.
+- P-20 Observable behavior: the declared authority for the scope (an assigned OpenSpec change, current OpenSpec spec, another tracker, or a privately authoritative specification) > implementation > private notes. A detected specification is a candidate until the owning review confirms it.
+- P-21 Technical architecture: global MUST > accepted project decision > global DEFAULT. A decision never overrides a MUST and never redeclares observable behavior; behavior authority changes go through `sot.md`.
 - P-22 Dependencies: project dependency files > private workspace overlays.
 - P-23 `status.md` is informational only and never overrides specifications, rules or issue records.
 - P-24 When code and the declared requirement disagree, determine which is stale and repair that source of truth. Never silently normalize the requirement to the code.

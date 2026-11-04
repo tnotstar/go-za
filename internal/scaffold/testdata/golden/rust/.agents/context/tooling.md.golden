@@ -1,6 +1,6 @@
 # Tooling
 
-Summary: Shared tools and command conventions. A project's `tools.md` defines its exact invocations and wins over these defaults.
+Summary: Shared tool conventions and the integration behavior of the enabled language workspaces. A project's `tools.md` defines its exact invocations and wins over these defaults.
 
 ## za
 
@@ -18,12 +18,18 @@ Native tools are used directly; their behavior is never emulated by hand.
 | `git` | Repository, submodule (`.gitmodules`, gitlinks) and worktree mechanism. |
 | `cargo`/`rustc` | Rust toolchain. Owns the root virtual `Cargo.toml` and, when Cargo creates one, the root `Cargo.lock`. Never install toolchains or components. |
 
+## Integration constraints
+
+Facts that affect reproducibility, kept only for the enabled capabilities:
+
+- A successful workspace build never proves standalone operation. When isolation cannot be established, validate in an external standalone checkout.
+- Rust: confirm the effective workspace root and members with `cargo metadata`; `--manifest-path` alone is not isolation, and a `.cargo/config.toml` above the project still applies. The root virtual Cargo workspace has explicit membership and excludes task worktrees.
+
 ## Conventions
 
 - Run commands directly with explicit arguments and working directories.
 - Prefer project-owned entry points (scripts, Make/Task targets, CI-equivalent commands) documented in project `tools.md` over reconstructed command lines.
 - Every documented command states its mode: `standalone` or `workspace`.
-- Rust standalone validation resolves the effective workspace root and members with `cargo metadata`; `--manifest-path` alone is not isolation; see `rust-standards.md`.
 - Capabilities a project requires (an OpenSpec CLI when OpenSpec is adopted, agent skills, plugins) are listed in its `tools.md`.
 
 ## Project context templates

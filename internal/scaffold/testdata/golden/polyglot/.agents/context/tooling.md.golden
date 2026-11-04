@@ -1,6 +1,6 @@
 # Tooling
 
-Summary: Shared tools and command conventions. A project's `tools.md` defines its exact invocations and wins over these defaults.
+Summary: Shared tool conventions and the integration behavior of the enabled language workspaces. A project's `tools.md` defines its exact invocations and wins over these defaults.
 
 ## za
 
@@ -19,13 +19,19 @@ Native tools are used directly; their behavior is never emulated by hand.
 | `go` | Go toolchain. Owns root `go.work` and `go.work.sum`; change membership with `go work use`. |
 | `uv` | Python project manager. Owns workspace resolution and every `uv.lock`. |
 
+## Integration constraints
+
+Facts that affect reproducibility, kept only for the enabled capabilities:
+
+- A successful workspace build never proves standalone operation. When isolation cannot be established, validate in an external standalone checkout.
+- Go: standalone checks in a task worktree set `GOWORK=off`; otherwise Go discovers the root `go.work` by walking parent directories. Root `go.work` references canonical checkouts only and never task worktrees.
+- uv: standalone validation uses the project's own `pyproject.toml` and `uv.lock` in isolation, from a task worktree excluded from the root uv workspace.
+
 ## Conventions
 
 - Run commands directly with explicit arguments and working directories.
 - Prefer project-owned entry points (scripts, Make/Task targets, CI-equivalent commands) documented in project `tools.md` over reconstructed command lines.
 - Every documented command states its mode: `standalone` or `workspace`.
-- Go standalone commands in task worktrees set `GOWORK=off`; see `go-standards.md`.
-- uv standalone validation runs from an excluded task worktree with the project's own `pyproject.toml` and `uv.lock`; see `python-standards.md`.
 - Capabilities a project requires (an OpenSpec CLI when OpenSpec is adopted, agent skills, plugins) are listed in its `tools.md`.
 
 ## Project context templates

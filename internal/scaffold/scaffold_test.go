@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -112,37 +113,47 @@ func TestRenderIsDeterministic(t *testing.T) {
 	}
 }
 
-// Hard size ceilings from the architecture's context budget.
+// Hard size ceilings from the architecture's context budget: the root guide
+// 4 KiB, the common guide 3 KiB, the project guide template 3 KiB.
 var ceilings = map[string]int{
-	"AGENTS.md":                                            4 << 10,
-	".agents/context/INDEX.md":                             3 << 10,
-	".agents/context/templates/issue.md":                   12 << 10,
-	".agents/context/templates/project/INDEX.md":           3 << 10,
-	".agents/context/templates/project/tools.md":           6 << 10,
-	".agents/context/templates/project/constraints.md":     6 << 10,
-	".agents/context/templates/project/source-of-truth.md": 6 << 10,
-	".agents/context/templates/project/status.md":          2 << 10,
-	".agents/context/templates/project/adr.md":             6 << 10,
+	"AGENTS.md":                                     4 << 10,
+	".agents/context/AGENTS.md":                     3 << 10,
+	".agents/context/templates/issue.md":            12 << 10,
+	".agents/context/templates/project/AGENTS.md":   3 << 10,
+	".agents/context/templates/project/tools.md":    6 << 10,
+	".agents/context/templates/project/sot.md":      6 << 10,
+	".agents/context/templates/project/status.md":   2 << 10,
+	".agents/context/templates/project/adr.md":      3 << 10,
+	".agents/context/templates/project/decision.md": 6 << 10,
 }
 
 func TestContextSizeBudgets(t *testing.T) {
-	s, err := Render(Options{Go: true, Python: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range s.Files {
-		limit, ok := ceilings[f.Path]
-		if !ok && strings.HasPrefix(f.Path, ".agents/context/") && !strings.Contains(f.Path, "/templates/") {
-			limit, ok = 8<<10, true
+	for _, m := range modes {
+		s, err := Render(m.opts)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if ok && len(f.Content) > limit {
-			t.Errorf("%s is %d bytes, exceeds ceiling of %d", f.Path, len(f.Content), limit)
+		for _, f := range s.Files {
+			limit, ok := ceilings[f.Path]
+			if !ok && strings.HasPrefix(f.Path, ".agents/context/") && !strings.Contains(f.Path, "/templates/") {
+				limit, ok = 8<<10, true
+			}
+			if ok && len(f.Content) > limit {
+				t.Errorf("%s (%s) is %d bytes, exceeds ceiling of %d", m.name, f.Path, len(f.Content), limit)
+			}
 		}
 	}
 }
 
 func TestRenderedContentInvariants(t *testing.T) {
 	obsolete := []string{".agents/context/_global/", ".agents/context/projects/"}
+	// Schema-3 files removed by schema 4: rendering them, or linking to
+	// them, would leave stale manuals and stale links in new workspaces.
+	stale := []string{
+		"INDEX.md", "principles.md", "roles.md", "glossary.md",
+		"go-standards.md", "python-standards.md", "rust-standards.md",
+		"constraints.md", "source-of-truth.md",
+	}
 	for _, m := range modes {
 		s, err := Render(m.opts)
 		if err != nil {
@@ -166,13 +177,108 @@ func TestRenderedContentInvariants(t *testing.T) {
 					t.Errorf("%s/%s: references obsolete pre-v5 context path %s", m.name, f.Path, o)
 				}
 			}
+			for _, name := range stale {
+				if bytes.Contains(f.Content, []byte(name)) {
+					t.Errorf("%s/%s: references the removed schema-3 file %s", m.name, f.Path, name)
+				}
+			}
 		}
 	}
 }
 
-// TestContextRootRouter guards the schema-3 routing structure: the context
-// root carries an INDEX.md router, the shared issue template exists, and no
-// empty project-container directory is generated.
+// TestGuidesAreIndependentlyUsable guards the schema-4 entry points: the
+// root guide routes to the common guide and to the managed project region,
+// the common guide routes to its topics, and every relative Markdown link in
+// a guide resolves against the guide's own directory.
+func TestGuidesAreIndependentlyUsable(t *testing.T) {
+	for _, m := range modes {
+		s, err := Render(m.opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		byPath := map[string][]byte{}
+		dirs := map[string]bool{}
+		for _, f := range s.Files {
+			byPath[f.Path] = f.Content
+			for dir := path.Dir(f.Path); dir != "."; dir = path.Dir(dir) {
+				dirs[dir] = true
+			}
+		}
+
+		// The root guide is language-independent: it renders identically for
+		// every mode and never branches on the selected languages.
+		if m.name == "go" {
+			rootGuide = byPath["AGENTS.md"]
+		} else if !bytes.Equal(rootGuide, byPath["AGENTS.md"]) {
+			t.Errorf("%s: AGENTS.md differs from the go-only rendering", m.name)
+		}
+
+		for _, guide := range []string{"AGENTS.md", ".agents/context/AGENTS.md"} {
+			c := byPath[guide]
+			if c == nil {
+				t.Fatalf("%s: %s not rendered", m.name, guide)
+			}
+			for _, target := range relativeMarkdownLinks(string(c)) {
+				dir := path.Dir(guide)
+				resolved := path.Clean(path.Join(dir, target))
+				if byPath[resolved] == nil && !dirs[strings.TrimSuffix(resolved, "/")] {
+					t.Errorf("%s/%s: link target %q does not resolve to a scaffolded file (from %s)", m.name, guide, target, resolved)
+				}
+			}
+		}
+
+		// The project guide template links its sibling documents: its
+		// relative references must resolve against an instantiated project
+		// context, which holds exactly these files.
+		guideDir := map[string]bool{}
+		for _, name := range []string{"AGENTS.md", "adr.md", "sot.md", "status.md", "tools.md"} {
+			guideDir[name] = true
+		}
+		for _, target := range relativeMarkdownLinks(string(byPath[".agents/context/templates/project/AGENTS.md"])) {
+			if !guideDir[path.Clean(target)] {
+				t.Errorf("%s: the project guide template links %q, which a project context will not contain", m.name, target)
+			}
+		}
+
+		// The common guide routes to mandatory policy; the root guide routes
+		// to the common guide and the managed project region.
+		if !bytes.Contains(byPath[".agents/context/AGENTS.md"], []byte("policy.md")) {
+			t.Errorf("%s: the common guide does not route to policy.md", m.name)
+		}
+		if !bytes.Contains(byPath["AGENTS.md"], []byte(".agents/context/AGENTS.md")) {
+			t.Errorf("%s: the root guide does not route to the common guide", m.name)
+		}
+	}
+}
+
+var rootGuide []byte
+
+// relativeMarkdownLinks returns the targets of Markdown links and images
+// that are relative URLs (no scheme, no leading slash and no fragment).
+func relativeMarkdownLinks(s string) []string {
+	var out []string
+	for _, m := range linkPattern.FindAllStringSubmatch(s, -1) {
+		target := m[1]
+		if target == "" || strings.Contains(target, "://") || strings.HasPrefix(target, "/") ||
+			strings.HasPrefix(target, "#") || strings.HasPrefix(target, "mailto:") {
+			continue
+		}
+		if i := strings.Index(target, "#"); i >= 0 {
+			target = target[:i]
+		}
+		if target != "" {
+			out = append(out, target)
+		}
+	}
+	return out
+}
+
+var linkPattern = regexp.MustCompile(`\]\(([^)\s]+)\)`)
+
+// TestContextRootRouter guards the schema-4 routing structure: the context
+// root carries the common AGENTS.md guide, the shared issue template exists,
+// the project guide template exists, and no empty project-container
+// directory is generated.
 func TestContextRootRouter(t *testing.T) {
 	for _, m := range modes {
 		s, err := Render(m.opts)
@@ -184,9 +290,12 @@ func TestContextRootRouter(t *testing.T) {
 			paths = append(paths, f.Path)
 		}
 		for _, want := range []string{
-			".agents/context/INDEX.md",
+			".agents/context/AGENTS.md",
 			".agents/context/templates/issue.md",
-			".agents/context/templates/project/INDEX.md",
+			".agents/context/templates/project/AGENTS.md",
+			".agents/context/templates/project/adr.md",
+			".agents/context/templates/project/decision.md",
+			".agents/context/templates/project/sot.md",
 		} {
 			if !slices.Contains(paths, want) {
 				t.Errorf("%s: %s not rendered", m.name, want)
@@ -194,6 +303,26 @@ func TestContextRootRouter(t *testing.T) {
 		}
 		if slices.Contains(paths, ".agents/context/projects/.gitkeep") {
 			t.Errorf("%s: generated the obsolete .agents/context/projects container", m.name)
+		}
+	}
+}
+
+// TestNoGlobalProvisioning guards the GLOBAL boundary: GLOBAL preferences
+// are external to the workspace, so the scaffold must never reference a
+// location in the user's home, name a personal directory, or instruct
+// agents to read or write one.
+func TestNoGlobalProvisioning(t *testing.T) {
+	for _, m := range modes {
+		s, err := Render(m.opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range s.Files {
+			for _, banned := range []string{"~/.agents", "$HOME", "~/", "home directory"} {
+				if bytes.Contains(f.Content, []byte(banned)) {
+					t.Errorf("%s/%s references the personal location %q; GLOBAL is external to the workspace", m.name, f.Path, banned)
+				}
+			}
 		}
 	}
 }
@@ -248,11 +377,11 @@ func TestTopLevel(t *testing.T) {
 
 func TestManifest(t *testing.T) {
 	want := map[string]string{
-		"go":       "schema = 3\n\n[workspace]\ngo = true\npython = false\nrust = false\n",
-		"python":   "schema = 3\n\n[workspace]\ngo = false\npython = true\nrust = false\n",
-		"rust":     "schema = 3\n\n[workspace]\ngo = false\npython = false\nrust = true\n",
-		"polyglot": "schema = 3\n\n[workspace]\ngo = true\npython = true\nrust = false\n",
-		"all":      "schema = 3\n\n[workspace]\ngo = true\npython = true\nrust = true\n",
+		"go":       "schema = 4\n\n[workspace]\ngo = true\npython = false\nrust = false\n",
+		"python":   "schema = 4\n\n[workspace]\ngo = false\npython = true\nrust = false\n",
+		"rust":     "schema = 4\n\n[workspace]\ngo = false\npython = false\nrust = true\n",
+		"polyglot": "schema = 4\n\n[workspace]\ngo = true\npython = true\nrust = false\n",
+		"all":      "schema = 4\n\n[workspace]\ngo = true\npython = true\nrust = true\n",
 	}
 	for _, m := range modes {
 		s, err := Render(m.opts)
@@ -302,7 +431,7 @@ func TestAllLanguageCombinations(t *testing.T) {
 			for _, f := range s.Files {
 				byPath[f.Path] = string(f.Content)
 			}
-			wantManifest := fmt.Sprintf("schema = 3\n\n[workspace]\ngo = %t\npython = %t\nrust = %t\n", tt.go_, tt.python, tt.rust)
+			wantManifest := fmt.Sprintf("schema = 4\n\n[workspace]\ngo = %t\npython = %t\nrust = %t\n", tt.go_, tt.python, tt.rust)
 			if got := byPath["za.toml"]; got != wantManifest {
 				t.Errorf("za.toml =\n%s\nwant\n%s", got, wantManifest)
 			}
@@ -320,7 +449,7 @@ func TestAllLanguageCombinations(t *testing.T) {
 
 // TestRustScaffold guards the Rust bootstrap contract: a virtual workspace
 // manifest and no dummy package, source directory or toolchain file; Rust
-// documents, routing and ignore rules only for Rust-enabled workspaces.
+// integration constraints and ignore rules only for Rust-enabled workspaces.
 func TestRustScaffold(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -331,13 +460,13 @@ func TestRustScaffold(t *testing.T) {
 		{
 			name:    "rust only",
 			opts:    Options{Rust: true},
-			present: []string{"Cargo.toml", ".agents/context/rust-standards.md"},
-			absent:  []string{"rust-toolchain.toml", "rust-toolchain", "src", ".agents/context/go-standards.md", ".agents/context/python-standards.md"},
+			present: []string{"Cargo.toml"},
+			absent:  []string{"rust-toolchain.toml", "rust-toolchain", "src", "go.work", "pyproject.toml"},
 		},
 		{
 			name:   "go and python without rust",
 			opts:   Options{Go: true, Python: true},
-			absent: []string{"Cargo.toml", ".agents/context/rust-standards.md"},
+			absent: []string{"Cargo.toml"},
 		},
 	}
 	for _, tt := range tests {
@@ -347,10 +476,8 @@ func TestRustScaffold(t *testing.T) {
 				t.Fatal(err)
 			}
 			byPath := map[string][]byte{}
-			var paths []string
 			for _, f := range s.Files {
 				byPath[f.Path] = f.Content
-				paths = append(paths, f.Path)
 			}
 			for _, p := range tt.present {
 				if _, ok := byPath[p]; !ok {
@@ -372,15 +499,23 @@ func TestRustScaffold(t *testing.T) {
 				}
 			}
 
-			// Rust routing exists exactly when Rust is selected, in both
-			// routers, and no router mentions rust-standards otherwise.
-			for _, router := range []string{"AGENTS.md", ".agents/context/INDEX.md"} {
-				c := byPath[router]
-				if c == nil {
-					t.Fatalf("%s not rendered", router)
-				}
-				if mentions := bytes.Contains(c, []byte("rust-standards")); mentions != tt.opts.Rust {
-					t.Errorf("%s rust-standards mention = %t, want %t:\n%s", router, mentions, tt.opts.Rust, c)
+			// The common tooling guide documents integration behavior for the
+			// enabled capabilities only: the cargo row and the Rust constraint
+			// appear exactly when Rust is selected, and never mention the
+			// removed per-language manuals.
+			tooling := byPath[".agents/context/tooling.md"]
+			if tooling == nil {
+				t.Fatalf(".agents/context/tooling.md not rendered")
+			}
+			if mentions := bytes.Contains(tooling, []byte("`cargo`/`rustc`")); mentions != tt.opts.Rust {
+				t.Errorf("tooling.md cargo row = %t, want %t:\n%s", mentions, tt.opts.Rust, tooling)
+			}
+			if mentions := bytes.Contains(tooling, []byte("cargo metadata")); mentions != tt.opts.Rust {
+				t.Errorf("tooling.md cargo metadata constraint = %t, want %t", mentions, tt.opts.Rust)
+			}
+			for _, capRow := range []string{"`go` | Go toolchain", "`uv` | Python project manager"} {
+				if want := tt.opts.Go || strings.HasPrefix(capRow, "`uv`") && tt.opts.Python; strings.Contains(string(tooling), capRow) != want {
+					t.Errorf("tooling.md row %q presence = %t, want %t", capRow, strings.Contains(string(tooling), capRow), want)
 				}
 			}
 

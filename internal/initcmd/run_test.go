@@ -49,19 +49,16 @@ var commonPaths = []string{
 	"AGENTS.md",
 	"CLAUDE.md",
 	"za.toml",
-	".agents/context/INDEX.md",
+	".agents/context/AGENTS.md",
 	".agents/context/policy.md",
-	".agents/context/principles.md",
 	".agents/context/tooling.md",
-	".agents/context/roles.md",
-	".agents/context/glossary.md",
 	".agents/context/templates/issue.md",
-	".agents/context/templates/project/INDEX.md",
-	".agents/context/templates/project/tools.md",
-	".agents/context/templates/project/constraints.md",
-	".agents/context/templates/project/source-of-truth.md",
-	".agents/context/templates/project/status.md",
+	".agents/context/templates/project/AGENTS.md",
 	".agents/context/templates/project/adr.md",
+	".agents/context/templates/project/decision.md",
+	".agents/context/templates/project/sot.md",
+	".agents/context/templates/project/status.md",
+	".agents/context/templates/project/tools.md",
 	".agents/hooks/meta",
 	".agents/hooks/public",
 	".agents/runtime",
@@ -78,23 +75,19 @@ func TestRunModes(t *testing.T) {
 		{
 			name:    "go only",
 			opts:    Options{Go: true},
-			present: []string{"go.work", ".agents/context/go-standards.md"},
-			absent:  []string{"pyproject.toml", ".agents/context/python-standards.md"},
+			present: []string{"go.work"},
+			absent:  []string{"pyproject.toml"},
 		},
 		{
 			name:    "python only",
 			opts:    Options{Python: true},
-			present: []string{"pyproject.toml", ".agents/context/python-standards.md"},
-			absent:  []string{"go.work", ".agents/context/go-standards.md"},
+			present: []string{"pyproject.toml"},
+			absent:  []string{"go.work"},
 		},
 		{
-			name: "polyglot",
-			opts: Options{Go: true, Python: true},
-			present: []string{
-				"go.work", "pyproject.toml",
-				".agents/context/go-standards.md",
-				".agents/context/python-standards.md",
-			},
+			name:    "polyglot",
+			opts:    Options{Go: true, Python: true},
+			present: []string{"go.work", "pyproject.toml"},
 		},
 	}
 	for _, tt := range tests {
@@ -125,16 +118,10 @@ func TestRunModes(t *testing.T) {
 					t.Errorf("za must not create %s", p)
 				}
 			}
-			wantContext := []string{"INDEX.md", "policy.md", "principles.md", "roles.md", "tooling.md", "glossary.md", "templates"}
-			if tt.opts.Go {
-				wantContext = append(wantContext, "go-standards.md")
-			}
-			if tt.opts.Python {
-				wantContext = append(wantContext, "python-standards.md")
-			}
-			if tt.opts.Rust {
-				wantContext = append(wantContext, "rust-standards.md")
-			}
+			// The context root holds exactly the COMMON set: the common guide,
+			// the policy and tooling topics, and the templates directory. No
+			// per-language manual is generated for any mode.
+			wantContext := []string{"AGENTS.md", "policy.md", "tooling.md", "templates"}
 			slices.Sort(wantContext)
 			if got := entries(t, filepath.Join(root, ".agents/context")); !slices.Equal(got, wantContext) {
 				t.Errorf(".agents/context contains %v, want %v", got, wantContext)
@@ -143,7 +130,7 @@ func TestRunModes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := fmt.Sprintf("schema = 3\n\n[workspace]\ngo = %t\npython = %t\nrust = %t\n", tt.opts.Go, tt.opts.Python, tt.opts.Rust)
+			want := fmt.Sprintf("schema = 4\n\n[workspace]\ngo = %t\npython = %t\nrust = %t\n", tt.opts.Go, tt.opts.Python, tt.opts.Rust)
 			if string(manifest) != want {
 				t.Errorf("za.toml =\n%s\nwant\n%s", manifest, want)
 			}
@@ -198,13 +185,12 @@ func TestRunRustOnlyMode(t *testing.T) {
 	if !res.Rust || res.CargoLock {
 		t.Errorf("Result = %+v", res)
 	}
-	for _, p := range append(slices.Clone(commonPaths), "Cargo.toml", ".agents/context/rust-standards.md") {
+	for _, p := range append(slices.Clone(commonPaths), "Cargo.toml") {
 		if !exists(t, filepath.Join(root, filepath.FromSlash(p))) {
 			t.Errorf("missing %s", p)
 		}
 	}
-	for _, p := range []string{"go.work", "pyproject.toml", ".agents/context/go-standards.md",
-		".agents/context/python-standards.md", "Cargo.lock", "rust-toolchain.toml", "src"} {
+	for _, p := range []string{"go.work", "pyproject.toml", "Cargo.lock", "rust-toolchain.toml", "src"} {
 		if exists(t, filepath.Join(root, filepath.FromSlash(p))) {
 			t.Errorf("unexpected %s", p)
 		}

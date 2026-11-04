@@ -1,12 +1,14 @@
 // Package manifest locates and reads za.toml, the za workspace manifest.
 //
-// Only schema 3 exists: the flat context layout with a context-root
-// INDEX.md router. The parser accepts exactly the TOML subset that
-// schema 3 needs: comments, blank lines, the [workspace] table header and
-// bare keys with integer or boolean values. Anything else, including unknown
-// keys and duplicates, is rejected rather than guessed at. Schemas 1 and 2
-// describe different, older layouts; they are rejected fail-closed, and no
-// migration exists.
+// Only schema 4 exists: the guide-based context layout whose entry points
+// are the root AGENTS.md, the common guide .agents/context/AGENTS.md and the
+// project guides .agents/context/<id>/AGENTS.md. The parser accepts exactly
+// the TOML subset that schema 4 needs: comments, blank lines, the
+// [workspace] table header and bare keys with integer or boolean values.
+// Anything else, including unknown keys and duplicates, is rejected rather
+// than guessed at. Schemas 1, 2 and 3 describe different, older layouts;
+// they are rejected fail-closed before any mutation, and no migration
+// exists.
 package manifest
 
 import (
@@ -25,12 +27,12 @@ import (
 const FileName = "za.toml"
 
 // SupportedSchema is the only workspace schema this za version understands.
-const SupportedSchema = 3
+const SupportedSchema = 4
 
 // ErrNotFound reports that no za.toml encloses the starting directory.
 var ErrNotFound = errors.New("not inside a za workspace")
 
-// Manifest is the typed content of a schema 3 za.toml.
+// Manifest is the typed content of a schema 4 za.toml.
 type Manifest struct {
 	Schema    int
 	Workspace Workspace
@@ -84,10 +86,10 @@ func Load(root string) (Manifest, error) {
 	return m, nil
 }
 
-// Parse parses a schema 3 manifest. Newly generated manifests record all
+// Parse parses a schema 4 manifest. Newly generated manifests record all
 // three capability booleans; reading an otherwise valid manifest without
-// workspace.rust means Rust is disabled, which keeps manifests written by
-// earlier schema-3 writers readable.
+// workspace.rust means Rust is disabled, so a hand-trimmed manifest stays
+// readable.
 func Parse(data []byte) (Manifest, error) {
 	m, seen, err := parseLines(data)
 	if err != nil {
@@ -187,7 +189,7 @@ func (e *UnsupportedSchemaError) Error() string {
 	return fmt.Sprintf("unsupported za workspace schema: %d (this za version supports schema %d only; there is no migration)", e.Schema, SupportedSchema)
 }
 
-// stripComment removes a trailing comment. Schema 3 has no string values, so
+// stripComment removes a trailing comment. Schema 4 has no string values, so
 // "#" never appears inside a value.
 func stripComment(line string) string {
 	before, _, _ := strings.Cut(line, "#")

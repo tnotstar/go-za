@@ -1,0 +1,42 @@
+# D-<NNNN>: <decide: title>
+
+- Status: Proposed | Accepted | Rejected | Superseded
+- Date: YYYY-MM-DD
+- Approver: <decide: who accepted or rejected this decision>
+- Scope: <decide: project/component>
+- Related requirement authority: <reference into `sot.md` or "none">
+- Supersedes: <decision ID or "none">
+- Superseded by: <decision ID or "none">
+
+## Context
+
+<decide: why a technical decision is required. Include only the facts needed to understand the decision. Confidential business or operational rationale may live here.>
+
+## Decision
+
+<decide: the selected technical decision.>
+
+## Consequences
+
+### Positive
+
+<decide: expected benefits>
+
+### Negative / trade-offs
+
+<decide: costs, limitations, migration burden, operational impact>
+
+## Alternatives considered
+
+<decide: only alternatives that materially influenced the decision.>
+
+## Verification
+
+<decide: how an agent can determine that the implementation still follows this decision.>
+
+## Lifecycle
+
+- Copy this file into `decisions/` under a stable ID; it, not a chat or an issue, is the record.
+- Edit the record during review; record acceptance or rejection with the approver, date, trade-offs and verification, then add the register row in `adr.md`.
+- Changing an accepted decision requires a successor: link both records (`Supersedes` and `Superseded by`) and set this record's status to Superseded.
+- An accepted decision may override a global DEFAULT, never a global MUST, and never redeclares observable behavior; behavior authority changes go through `sot.md`.

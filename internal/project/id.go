@@ -8,7 +8,7 @@ import (
 // reservedIDs are names a project directory must never take. Workspace-root
 // files are owned by za or native tools; the context names are reserved
 // direct children of .agents/context/ under the workspace schema. Existing
-// user-authored GLOBAL topics also occupy that namespace and are checked
+// user-authored COMMON topics also occupy that namespace and are checked
 // separately against the live context directory.
 //
 // Comparison is case-insensitive: on case-insensitive filesystems a
@@ -25,15 +25,9 @@ var reservedIDs = []string{
 	"Cargo.toml",
 	"Cargo.lock",
 	// Reserved direct children of .agents/context/.
-	"INDEX.md",
+	"AGENTS.md",
 	"policy.md",
-	"principles.md",
-	"go-standards.md",
-	"python-standards.md",
-	"rust-standards.md",
 	"tooling.md",
-	"roles.md",
-	"glossary.md",
 	"templates",
 	"issues",
 }

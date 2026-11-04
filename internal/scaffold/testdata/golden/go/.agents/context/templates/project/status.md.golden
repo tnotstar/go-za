@@ -1,5 +1,7 @@
 # Project Status: <project-id>
 
+Summary: Observed execution state, not authority. Nothing here overrides `sot.md`, the decisions or the project repository.
+
 - Phase: <decide: bootstrap | active-development | maintenance>
 - Pin observed: YYYY-MM-DD
 - Pinned gitlink: `<full-submodule-SHA>`
@@ -16,3 +18,10 @@
 ## Next steps
 
 - <decide: at most three concrete items>
+
+## Verification record
+
+Marking context verified requires an entry naming all of: the reviewed scope, the revision it was reviewed against, the reviewer, the date and the evidence. A changed basis — pin, authority or context content — reopens verification for the affected scope.
+
+| Verified scope | Revision | Reviewer | Date | Evidence |
+|---|---|---|---|---|

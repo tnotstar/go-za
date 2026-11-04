@@ -14,14 +14,14 @@ const (
 	routesEnd   = "<!-- za:projects:end -->"
 
 	noRoutes     = "_No projects registered._"
-	routesHeader = "| Project ID | Canonical checkout | Private index |"
+	routesHeader = "| Project ID | Canonical checkout | Private guide |"
 	routesRule   = "|---|---|---|"
 )
 
-var routeRow = regexp.MustCompile("^\\| `([^`]+)` \\| `([^`]+)/` \\| `\\.agents/context/([^`]+)/INDEX\\.md` \\|$")
+var routeRow = regexp.MustCompile("^\\| `([^`]+)` \\| `([^`]+)/` \\| `\\.agents/context/([^`]+)/AGENTS\\.md` \\|$")
 
 func routeLine(id string) string {
-	return fmt.Sprintf("| `%s` | `%s/` | `.agents/context/%s/INDEX.md` |", id, id, id)
+	return fmt.Sprintf("| `%s` | `%s/` | `.agents/context/%s/AGENTS.md` |", id, id, id)
 }
 
 // addRoute returns agents with a route to id added to the managed region.

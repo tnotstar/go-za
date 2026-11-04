@@ -1,6 +1,6 @@
 # Tooling
 
-Summary: Shared tools and command conventions. A project's `tools.md` defines its exact invocations and wins over these defaults.
+Summary: Shared tool conventions and the integration behavior of the enabled language workspaces. A project's `tools.md` defines its exact invocations and wins over these defaults.
 
 ## za
 
@@ -26,20 +26,26 @@ Native tools are used directly; their behavior is never emulated by hand.
 | `cargo`/`rustc` | Rust toolchain. Owns the root virtual `Cargo.toml` and, when Cargo creates one, the root `Cargo.lock`. Never install toolchains or components. |
 {{- end}}
 
+## Integration constraints
+
+Facts that affect reproducibility, kept only for the enabled capabilities:
+
+- A successful workspace build never proves standalone operation. When isolation cannot be established, validate in an external standalone checkout.
+{{- if .Go}}
+- Go: standalone checks in a task worktree set `GOWORK=off`; otherwise Go discovers the root `go.work` by walking parent directories. Root `go.work` references canonical checkouts only and never task worktrees.
+{{- end}}
+{{- if .Python}}
+- uv: standalone validation uses the project's own `pyproject.toml` and `uv.lock` in isolation, from a task worktree excluded from the root uv workspace.
+{{- end}}
+{{- if .Rust}}
+- Rust: confirm the effective workspace root and members with `cargo metadata`; `--manifest-path` alone is not isolation, and a `.cargo/config.toml` above the project still applies. The root virtual Cargo workspace has explicit membership and excludes task worktrees.
+{{- end}}
+
 ## Conventions
 
 - Run commands directly with explicit arguments and working directories.
 - Prefer project-owned entry points (scripts, Make/Task targets, CI-equivalent commands) documented in project `tools.md` over reconstructed command lines.
 - Every documented command states its mode: `standalone` or `workspace`.
-{{- if .Go}}
-- Go standalone commands in task worktrees set `GOWORK=off`; see `go-standards.md`.
-{{- end}}
-{{- if .Python}}
-- uv standalone validation runs from an excluded task worktree with the project's own `pyproject.toml` and `uv.lock`; see `python-standards.md`.
-{{- end}}
-{{- if .Rust}}
-- Rust standalone validation resolves the effective workspace root and members with `cargo metadata`; `--manifest-path` alone is not isolation; see `rust-standards.md`.
-{{- end}}
 - Capabilities a project requires (an OpenSpec CLI when OpenSpec is adopted, agent skills, plugins) are listed in its `tools.md`.
 
 ## Project context templates

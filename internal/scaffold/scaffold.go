@@ -1,35 +1,32 @@
 // Package scaffold renders the za-managed files of a new meta-workspace from
 // embedded templates.
 //
-// Every file under templates/ carries a ".tmpl" suffix, which is removed in
-// the output. The suffix keeps files such as AGENTS.md, CLAUDE.md and
-// .gitignore inert inside this repository.
+// Rendering is uniform: every file under templates/ carries the ".tmpl"
+// suffix, which the tmpl package removes in the output. The suffix keeps
+// files such as AGENTS.md, CLAUDE.md and .gitignore inert inside this
+// repository.
 //
 // The rendered za.toml is the workspace manifest. Its "schema" key is the
 // version of the workspace layout, independent of the za release version.
 package scaffold
 
 import (
-	"bytes"
 	"embed"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
-	"text/template"
+
+	"github.com/tnotstar/go-za/internal/tmpl"
 )
 
 //go:embed all:templates
 var templates embed.FS
 
-const (
-	templateRoot = "templates"
-	templateExt  = ".tmpl"
-)
+const templateRoot = "templates"
 
 // Options selects the workspace types to scaffold.
 type Options struct {
@@ -40,10 +37,7 @@ type Options struct {
 
 // File is one rendered file. Path is slash-separated and relative to the
 // workspace root.
-type File struct {
-	Path    string
-	Content []byte
-}
+type File = tmpl.File
 
 // Scaffold is the complete set of za-managed workspace content.
 type Scaffold struct {
@@ -53,58 +47,32 @@ type Scaffold struct {
 	Dirs []string
 }
 
-// conditional lists files rendered only for some workspace types.
+// conditional lists files rendered only for some workspace types. Language
+// integration facts are not separate files: the common tooling guide carries
+// them conditionally for the enabled capabilities.
 var conditional = map[string]func(Options) bool{
-	".agents/context/go-standards.md":     func(o Options) bool { return o.Go },
-	".agents/context/python-standards.md": func(o Options) bool { return o.Python },
-	".agents/context/rust-standards.md":   func(o Options) bool { return o.Rust },
-	"Cargo.toml":                          func(o Options) bool { return o.Rust },
+	"Cargo.toml": func(o Options) bool { return o.Rust },
 }
 
 var ignoredDirs = []string{".agents/runtime", ".worktrees"}
 
-// Render renders the scaffold for opts deterministically.
+// Render renders the scaffold for opts deterministically. Rendering itself
+// is delegated to the tmpl package; scaffold only decides which rendered
+// files belong to the workspace (conditional per-language content) and which
+// directories are created empty.
 func Render(opts Options) (Scaffold, error) {
 	s := Scaffold{Dirs: slices.Clone(ignoredDirs)}
-	err := fs.WalkDir(templates, templateRoot, func(name string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		if !strings.HasSuffix(name, templateExt) {
-			return fmt.Errorf("template %s lacks the %s suffix", name, templateExt)
-		}
-		rel := strings.TrimSuffix(strings.TrimPrefix(name, templateRoot+"/"), templateExt)
-		if include, ok := conditional[rel]; ok && !include(opts) {
-			return nil
-		}
-
-		content, err := render(name, opts)
-		if err != nil {
-			return err
-		}
-		s.Files = append(s.Files, File{Path: rel, Content: content})
-		return nil
-	})
+	files, err := tmpl.Render(templates, templateRoot, opts)
 	if err != nil {
-		return Scaffold{}, fmt.Errorf("render scaffold: %w", err)
+		return Scaffold{}, err
+	}
+	for _, f := range files {
+		if include, ok := conditional[f.Path]; ok && !include(opts) {
+			continue
+		}
+		s.Files = append(s.Files, f)
 	}
 	return s, nil
-}
-
-func render(name string, opts Options) ([]byte, error) {
-	src, err := templates.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-	tmpl, err := template.New(name).Option("missingkey=error").Parse(string(src))
-	if err != nil {
-		return nil, err
-	}
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, opts); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 // TopLevel returns the sorted, unique top-level entry names s creates.

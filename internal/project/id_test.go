@@ -43,31 +43,35 @@ func TestDeriveID(t *testing.T) {
 		"https://github.com/org/ñu":      "only ASCII",
 		"https://github.com/org/za.toml": "reserved",
 		"https://github.com/org/go.work": "reserved",
-		// Reserved context names under the schema-3 flat layout.
-		"https://github.com/org/issues":          "reserved",
-		"https://github.com/org/templates":       "reserved",
-		"https://github.com/org/INDEX.md":        "reserved",
-		"https://github.com/org/policy.md":       "reserved",
-		"https://github.com/org/tooling.md":      "reserved",
-		"https://github.com/org/glossary.md":     "reserved",
-		"https://github.com/org/roles.md":        "reserved",
-		"https://github.com/org/go-standards.md": "reserved",
-		"https://github.com/org/CLAUDE.md":       "reserved",
+		// Reserved context names under the schema-4 flat layout.
+		"https://github.com/org/issues":     "reserved",
+		"https://github.com/org/templates":  "reserved",
+		"https://github.com/org/AGENTS.md":  "reserved",
+		"https://github.com/org/policy.md":  "reserved",
+		"https://github.com/org/tooling.md": "reserved",
+		"https://github.com/org/CLAUDE.md":  "reserved",
+		"https://github.com/org/sot.md":     "not reserved",
+		"https://github.com/org/adr.md":     "not reserved",
 		// Rust names, reserved regardless of the workspace's capabilities.
-		"https://github.com/org/rust-standards.md": "reserved",
-		"https://github.com/org/Cargo.toml":        "reserved",
-		"https://github.com/org/Cargo.lock":        "reserved",
-		"https://github.com/org/RUST-STANDARDS.MD": "reserved",
-		"https://github.com/org/cargo.toml":        "reserved",
+		"https://github.com/org/Cargo.toml": "reserved",
+		"https://github.com/org/Cargo.lock": "reserved",
+		"https://github.com/org/cargo.toml": "reserved",
 		// Case-equivalent names collide on case-insensitive filesystems.
-		"https://github.com/org/Policy.md": "reserved",
-		"https://github.com/org/ISSUES":    "reserved",
-		"https://github.com/org/Templates": "reserved",
-		"https://github.com/org/ZA.TOML":   "reserved",
-		"https://github.com/org/index.md":  "reserved",
+		"https://github.com/org/Policy.md":  "reserved",
+		"https://github.com/org/ISSUES":     "reserved",
+		"https://github.com/org/Templates":  "reserved",
+		"https://github.com/org/ZA.TOML":    "reserved",
+		"https://github.com/org/agents.md":  "reserved",
+		"https://github.com/org/Tooling.md": "reserved",
 	}
 	for in, want := range invalid {
 		got, err := DeriveID(in)
+		if want == "not reserved" {
+			if err != nil {
+				t.Errorf("DeriveID(%q) = %q, %v; want a valid ID", in, got, err)
+			}
+			continue
+		}
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("DeriveID(%q) = %q, %v; want error containing %q", in, got, err, want)
 		}

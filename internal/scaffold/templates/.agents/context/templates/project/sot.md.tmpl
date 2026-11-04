@@ -1,0 +1,28 @@
+# Requirement Authorities: <project-id>
+
+Summary: The scoped authority map for this project. Each subject has at most one active authority, and a scope needed for implementation must have exactly one. Entries stay `unresolved` where evidence is absent; every mapping names a real, checkable location.
+
+| Subject/scope | Authority | Location | Evidence |
+|---|---|---|---|
+| Observable behavior (current) | <discover: current behavior authority> | <discover: current behavior location> | <discover: revision or date> |
+| Observable behavior (proposed) | <discover: proposed behavior authority> | <discover: proposed behavior location> | <discover: revision or date> |
+| API contract | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
+| Database/schema | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
+| Configuration keys/defaults | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
+| Go dependencies | `<project-id>` repository | `<project-id>/go.mod` | <discover: `<project-id>/go.sum` or not applicable> |
+| Python dependencies | <discover: `<project-id>` repository or not applicable> | <discover: `<project-id>/pyproject.toml` or not applicable> | <discover: `<project-id>/uv.lock` or not applicable> |
+| Cargo dependencies | <discover: `<project-id>` repository or not applicable> | <discover: `<project-id>/Cargo.toml` or not applicable> | <discover: `<project-id>/Cargo.lock` or not applicable> |
+| Go integration overlay | private meta-repository | <discover: `/go.work` or not applicable> | <discover: revision or date> |
+| Python integration overlay | private meta-repository | <discover: `/pyproject.toml` + `/uv.lock` or not applicable> | <discover: revision or date> |
+| Cargo integration overlay | private meta-repository | <discover: `/Cargo.toml` or not applicable> | <discover: revision or date> |
+| Build/release implementation | `<project-id>` repository | <discover: Makefile/script/CI path> | <discover: revision or date> |
+| Technical decisions | this project's private context | `.agents/context/<project-id>/adr.md` | the register and `decisions/` |
+| Execution status | this project's private context | `.agents/context/<project-id>/status.md` | informational only |
+
+## Rules
+
+- Authority is scoped: different subjects may have different authoritative sources without duplication. A local copy never silently becomes a competing specification; link to the authority instead of restating it.
+- An entry without evidence stays `unresolved`. A scope needed for the task is resolved before implementation: record what is missing, never a guess.
+- Transferring or replacing an authority is the scope owner's change: replace the mapping row and record the evidence in the same review. Superseded locations move into the Evidence column; two active authorities for one scope are always an error.
+- A detected specification is a candidate only: detection never confers authority until the owning review confirms it.
+- A discrepancy between implementation and the declared authority is reported, not silently normalized. An external authority remains authoritative even when it cannot be fetched; record the gap instead of fabricating its contents.

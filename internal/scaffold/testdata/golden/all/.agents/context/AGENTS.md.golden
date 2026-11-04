@@ -1,0 +1,31 @@
+# Common Guide
+
+Summary: Shared rules of this workspace. The root `AGENTS.md` selects the task scope and the project; this guide answers which shared rules apply and routes to the topic needed for the task.
+
+## Mandatory policy
+
+Read [policy.md](policy.md) first. Its MUST rules bind every project and every agent in this workspace; project context may strengthen them but never weaken them.
+
+## Topics
+
+| Need | Read |
+|---|---|
+| Integration behavior of the enabled language workspaces | [tooling.md](tooling.md) |
+| Template for workspace and project issues | [templates/issue.md](templates/issue.md) |
+| Scaffold source for new project contexts | [templates/project/](templates/project/) |
+
+## Projects
+
+Project context lives at `.agents/context/<project-id>/AGENTS.md`. Registered projects are routed from the managed region of the root `AGENTS.md`; this guide never duplicates that list. Load a project's guide only once the task selects that project, and never load sibling project context.
+
+## Issues
+
+Workspace and cross-project issues live under `issues/` when present, one Markdown file per issue following `templates/issue.md`. Issues are reached by ID or reference; never load the collection wholesale.
+
+## GLOBAL
+
+GLOBAL preferences are personal settings owned by the user's coding tool, outside this workspace. They are optional, user-managed, and never discovered, provisioned or modified here; COMMON policy and project authorities apply regardless of personal settings.
+
+## Stop reading when
+
+The mandatory policy and the one topic this task needs are known. Load only what the task names; never preload this directory.

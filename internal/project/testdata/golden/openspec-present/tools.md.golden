@@ -1,6 +1,6 @@
 # Tools and Commands: pub
 
-Summary: Exact supported entry points for agents. Prefer project-owned scripts, Make/Task targets or CI-equivalent commands over reconstructed command lines.
+Summary: Real entry points for building, testing and validating this project, each with its working directory and validation mode. Prefer project-owned scripts, Make/Task targets or CI-equivalent commands over reconstructed command lines.
 
 ## Project commands
 
@@ -24,16 +24,10 @@ Summary: Exact supported entry points for agents. Prefer project-owned scripts, 
 | uv/Python | <discover: yes/no> | <discover: version source and invocation> |
 | Rust | <discover: yes/no> | <discover: version source and invocation> |
 
-## Workspace contract
+## Validation contract
 
-- `standalone` means the project must behave as if cloned independently.
+- `standalone` means the project must behave as if cloned independently; a successful integration-workspace run never substitutes for it.
 - `workspace` means the private meta-repository integration overlay is intentionally active.
-- Never substitute workspace success for standalone success.
-- For Go, standalone commands in task worktrees set `GOWORK=off`.
-- For uv, standalone validation runs from a task worktree excluded from the root uv workspace, using this project's own `pyproject.toml`/`uv.lock`.
-
-## Rules
-
-- Use the commands above instead of inventing alternate build/test paths.
+- Use the commands above instead of inventing alternate build/test paths. A command is documented here only once it is known to work.
 - If a documented command is stale, update this file as part of the task.
 - Record secret names only; never secret values.

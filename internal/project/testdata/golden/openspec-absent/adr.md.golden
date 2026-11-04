@@ -1,0 +1,15 @@
+# Decision Register: pub
+
+Summary: The complete index of this project's decision records under `decisions/`. Every decision gets exactly one row here and one record file there; open a record by its linked ID instead of reconstructing it from this register.
+
+| ID | Title | Status | Supersedes | Record |
+|---|---|---|---|---|
+
+## Register rules
+
+- Add one row when the record file is created; the record under `decisions/` is the authority for the decision's content.
+- Status mirrors the record: Proposed, Accepted, Rejected or Superseded.
+- Acceptance or rejection records the approver, date, trade-offs and verification in the record itself.
+- Changing an accepted decision requires a successor record: the successor lists this ID as `Supersedes`, the predecessor lists the successor as `Superseded by`, and the predecessor's status becomes Superseded. Superseded records stay unchanged apart from the status and the link.
+- An accepted decision may override a global DEFAULT, never a global MUST, and never redeclares observable behavior; behavior authority changes go through `sot.md`.
+- Transferring a requirement authority is not a decision by itself: replace the mapping in `sot.md` and record the evidence in the same review.

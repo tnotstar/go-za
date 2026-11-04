@@ -21,7 +21,7 @@ func TestAddRouteFirstProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := before + region(routesHeader+"\n"+routesRule+"\n"+
-		"| `go-za` | `go-za/` | `.agents/context/go-za/INDEX.md` |\n") + after
+		"| `go-za` | `go-za/` | `.agents/context/go-za/AGENTS.md` |\n") + after
 	if string(got) != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
@@ -63,7 +63,7 @@ func TestAddRouteRejects(t *testing.T) {
 		{"marker not on own line", "x " + routesStart + "\n" + routesEnd + "\n", "alone on its own line"},
 		{"end marker inline", routesStart + "\n" + noRoutes + routesEnd + "\n", "alone on its own line"},
 		{"foreign content", region("- my notes\n"), "did not generate"},
-		{"foreign row", region(table + "| `x` | `y/` | `.agents/context/projects/x/INDEX.md` |\n"), "did not generate"},
+		{"foreign row", region(table + "| `x` | `y/` | `.agents/context/projects/x/AGENTS.md` |\n"), "did not generate"},
 		{"duplicate row", region(table + routeLine("foo") + "\n"), "routed twice"},
 		{"already routed", region(table), "already routes project"},
 	}

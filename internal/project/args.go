@@ -35,7 +35,7 @@ The command:
 It never writes to the project repository. If any step fails, the workspace
 is rolled back to its previous state.
 
-Requirements: a schema-3 Go-enabled za workspace (za.toml), with a committed
+Requirements: a schema-4 Go-enabled za workspace (za.toml), with a committed
 bootstrap and no uncommitted changes; executables git and go.
 `
 

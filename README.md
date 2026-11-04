@@ -17,6 +17,7 @@ projects may be public, client-private or otherwise restricted.
 |---|---|
 | `za init` | Initializes an empty directory as a meta-workspace |
 | `za project add` | Adds one root-module Go repository as a project (first minimal version) |
+| `za version` | Prints the version of the executable and its build provenance |
 
 `za` creates no worktrees, installs no hooks and never calls GitHub or any
 other provider API. Those, and the rest of the project lifecycle (remove,
@@ -277,6 +278,65 @@ with the same command. If rollback cannot complete, `za` says what is left.
 
 Exit status follows `za init`: `0` success, `1` operational failure, `2`
 invalid usage.
+
+## `za version`
+
+```text
+za version
+```
+
+Prints the version of the executable: one summary line and one detail line
+per available fact.
+
+```text
+za (devel) (development build)
+  module:    github.com/tnotstar/go-za
+  revision:  3996d08e0e873ecd3fcd38a755f7c9fc2a666d36 (modified)
+  committed: 2026-11-04T11:26:48Z
+  go:        go1.27.2
+```
+
+### Version kinds
+
+The version kind distinguishes how the executable was produced:
+
+| Kind | Main module version | Typical producer |
+|---|---|---|
+| `release` | Tagged semantic version (`v1.2.3`, `v1.2.3-rc.1+build.5`) | `go install github.com/tnotstar/go-za/cmd/za@v1.2.3` |
+| `Go pseudo-version` | Pseudo-version (`v0.0.0-20261104112648-3996d08e0e87`) | `go install ...@<branch-or-commit>` without a tag |
+| `development build` | `(devel)` | `go build ./cmd/za`, `make build`, `make install` |
+
+### Metadata source and precedence
+
+The version is read exclusively from the **Go runtime build information**
+embedded at link time (`runtime/debug.ReadBuildInfo`): the main module
+version and the `vcs.revision`, `vcs.time` and `vcs.modified` settings.
+
+- There is deliberately **no build-time injection** (`-ldflags -X ...`) and
+  **no version constant in the source**: one mechanism, one truth, no drift.
+  Every supported build path (`go build`, `make build`, `make install`,
+  `go install ...@version`) stamps the same metadata automatically.
+- Classification precedence: a build whose source had **uncommitted
+  modifications** (`vcs.modified=true`, or the version string carries a
+  `+dirty` suffix) is a **development build**, however the toolchain named
+  the version — current Go stamps local builds as a pseudo-version of HEAD
+  with `+dirty` rather than the literal `(devel)`. Otherwise `(devel)` is a
+  development build, a pseudo-version shape is a `Go pseudo-version`, and a
+  tagged semantic version is a `release`. A local untagged build therefore
+  stays identifiable as a development build while its source is modified,
+  and a clean tree is reported as the exact pseudo-version of its commit.
+- When VCS stamping is unavailable — a build outside a Git checkout, or with
+  `-buildvcs=false` — the revision line reports it explicitly as
+  unavailable. `za` never invents values.
+- `committed:` is the commit time of the stamped source revision (VCS
+  provenance), not the wall-clock time of the build.
+
+### Independence and compatibility
+
+`za version` performs no workspace discovery and invokes no external tool:
+it works outside any `za` workspace, without Git and without network
+access. Existing commands and the `--help` output are unchanged except for
+the added `version` line.
 
 ## Generated workspace
 

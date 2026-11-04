@@ -41,6 +41,7 @@ func TestRun(t *testing.T) {
 		{name: "init go", args: []string{"init", "--go", filepath.Join(t.TempDir(), "go")}, code: ExitOK, stdout: "  Go:     enabled\n  Python: disabled"},
 		{name: "init python", args: []string{"init", "--python", filepath.Join(t.TempDir(), "py")}, code: ExitOK, stdout: "  Go:     disabled\n  Python: enabled"},
 		{name: "help lists project", args: []string{"--help"}, code: ExitOK, stdout: "project  Manage the projects"},
+		{name: "help lists version", args: []string{"--help"}, code: ExitOK, stdout: "version  Print the version"},
 		{name: "project without command", args: []string{"project"}, code: ExitUsage, stderr: "za project <command>", noCommands: true},
 		{name: "project help", args: []string{"project", "--help"}, code: ExitOK, stdout: "add     Add a Go repository"},
 		{name: "project unknown command", args: []string{"project", "list"}, code: ExitUsage, stderr: `unknown project command "list"`, noCommands: true},
@@ -51,6 +52,11 @@ func TestRun(t *testing.T) {
 		{name: "project add empty url", args: []string{"project", "add", ""}, code: ExitUsage, stderr: "must not be empty", noCommands: true},
 		{name: "project add outside workspace", args: []string{"project", "add", "https://h/o/a.git"}, getwd: outside, code: ExitFailure, stderr: "error: not inside a za workspace", noCommands: true},
 		{name: "init polyglot", args: []string{"init", "--go", "--python", filepath.Join(t.TempDir(), "both")}, code: ExitOK, stdout: "  Go:     enabled\n  Python: enabled"},
+		{name: "version", args: []string{"version"}, code: ExitOK, stdout: "za ", noCommands: true},
+		{name: "version outside workspace", args: []string{"version"}, getwd: outside, code: ExitOK, stdout: "za ", noCommands: true},
+		{name: "version help", args: []string{"version", "--help"}, code: ExitOK, stdout: "za version", noCommands: true},
+		{name: "version extra argument", args: []string{"version", "extra"}, code: ExitUsage, stderr: `unexpected argument "extra"`, noCommands: true},
+		{name: "version too many arguments", args: []string{"version", "a", "b"}, code: ExitUsage, stderr: "too many arguments", noCommands: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

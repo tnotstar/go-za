@@ -24,7 +24,7 @@ Summary: Observed execution state, not authority. Nothing here overrides `sot.md
 
 ## Verification record
 
-One row per verified scope. The summary above is derived from these rows and never overrides them.
+One row per verification event. The summary above is derived from these rows and never overrides them.
 
 | Verified scope | Reviewed revision | Reviewer | Date | Evidence |
 |---|---|---|---|---|

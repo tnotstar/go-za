@@ -25,7 +25,7 @@ Load only the documents this task needs; resolve relative references against thi
 
 ## Before source work
 
-1. Establish the intended task base: the pinned gitlink (`git ls-files -s <project-id>` from the workspace root), the canonical checkout `HEAD` and the base you intend to build on. Upstream advancement and upstream information that is unavailable are recorded as material divergence; neither stops the task by itself.
+1. Establish the intended task base: the pinned gitlink (`git ls-files -s <project-id>` from the workspace root), the canonical checkout `HEAD` and the base you intend to build on. Record observed differences that affect the task. If upstream information is unavailable, report that limitation. Upstream advancement or unavailable upstream information alone does not block the task.
 2. Inspect local changes and compare the task worktree with that base. Project-source changes happen in a task worktree under `.worktrees/<project-id>/<task-id>/`; recursive search stays inside that worktree, never the whole `.worktrees/` collection.
 3. Assess the verification evidence for the affected scope in [status.md](status.md): a verified scope supports work while unrelated scopes stay pending. Pause only dependent implementation when the task base is ambiguous, the affected scope's authority in [sot.md](sot.md) is `unresolved` or the evidence is insufficient; investigation and context maintenance that close those gaps proceed normally.
 4. Read the architectural constraints identified in [sot.md](sot.md) and the relevant accepted decisions in [adr.md](adr.md) before design or source changes.

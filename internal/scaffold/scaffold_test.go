@@ -240,7 +240,7 @@ func TestScaffoldInstructionContracts(t *testing.T) {
 			"workspace-relative",
 			"against this guide's own directory",
 			// Scoped gate and pause conditions in the project guide.
-			"neither stops the task by itself",
+			"alone does not block the task",
 			"a verified scope supports work while unrelated scopes stay pending",
 			"Pause only dependent implementation when the task base is ambiguous",
 			// Constraint routing before design or source changes.

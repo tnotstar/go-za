@@ -154,6 +154,10 @@ func TestRenderedContentInvariants(t *testing.T) {
 		"go-standards.md", "python-standards.md", "rust-standards.md",
 		"constraints.md", "source-of-truth.md",
 	}
+	// Retired instruction wording: rule strength belongs to COMMON, and the
+	// pre-correction templates carried both the wrong template suffix and a
+	// blanket verification gate.
+	banned := []string{"global MUST", "global DEFAULT", "AGENTS.md.temp", "Context verified:"}
 	for _, m := range modes {
 		s, err := Render(m.opts)
 		if err != nil {
@@ -181,6 +185,112 @@ func TestRenderedContentInvariants(t *testing.T) {
 				if bytes.Contains(f.Content, []byte(name)) {
 					t.Errorf("%s/%s: references the removed schema-3 file %s", m.name, f.Path, name)
 				}
+			}
+			for _, phrase := range banned {
+				if bytes.Contains(f.Content, []byte(phrase)) {
+					t.Errorf("%s/%s: contains retired wording %q", m.name, f.Path, phrase)
+				}
+			}
+		}
+	}
+}
+
+// TestScaffoldInstructionContracts pins short semantic anchors of the
+// corrected instruction set: the scoped freshness gate, the scoped
+// verification model, the COMMON/GLOBAL boundary, explicit multi-project
+// access, path semantics and the unified decision lifecycle. Anchors are
+// deliberately short phrases, not paragraphs.
+func TestScaffoldInstructionContracts(t *testing.T) {
+	s, err := Render(Options{Go: true, Python: true, Rust: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byPath := map[string]string{}
+	for _, f := range s.Files {
+		byPath[f.Path] = string(f.Content)
+	}
+	anchors := map[string][]string{
+		".agents/context/policy.md": {
+			// Scoped freshness gate: no blanket write prohibition.
+			"does not independently block",
+			"Pause only dependent implementation",
+			"never synchronize a pin, reset a checkout or update a gitlink",
+			// Worktree traversal and write locations.
+			"Recursive search is allowed inside the selected task worktree",
+			"never traverse the `.worktrees/` collection recursively",
+			"Project-source changes happen in a task worktree",
+			"belong in the meta-repository",
+			// COMMON/GLOBAL boundary.
+			"Private context owned by this workspace",
+			"neither requires, provisions, modifies nor recursively inspects",
+			"empty personal profile",
+			"surfaced for resolution",
+			// Rule-strength vocabulary.
+			"COMMON MUST > accepted project decision > COMMON DEFAULT",
+		},
+		".agents/context/AGENTS.md": {
+			// Explicit multi-project access with implicit access prohibited.
+			"every project the task names",
+			"never read the context of a project the task does not name",
+			"empty personal profile",
+			"supported loading mechanisms",
+		},
+		".agents/context/templates/project/AGENTS.md": {
+			// Path semantics: workspace-relative vs document-relative.
+			"workspace-relative",
+			"against this guide's own directory",
+			// Scoped gate and pause conditions in the project guide.
+			"neither stops the task by itself",
+			"a verified scope supports work while unrelated scopes stay pending",
+			"Pause only dependent implementation when the task base is ambiguous",
+			// Constraint routing before design or source changes.
+			"architectural constraints identified in",
+		},
+		".agents/context/templates/project/status.md": {
+			// Scoped verification model.
+			"derived from these rows and never overrides them",
+			"Registration records the observed pin and leaves every scope pending",
+			"A verified scope supports work on that scope while unrelated scopes stay pending",
+			"Matching SHAs alone are not evidence",
+			"triggers reassessment of the affected scope only",
+			"does not invalidate technical verification",
+			"keep the previous row as prior evidence",
+			// When to update.
+			"Leave it unchanged otherwise",
+		},
+		".agents/context/templates/project/sot.md": {
+			// Constraint routing and discovery states.
+			"| Architectural constraints |",
+			"Never keep a second copy",
+			"genuinely absent",
+			"discovery has not happened yet",
+		},
+		".agents/context/templates/project/adr.md": {
+			// Register/record lifecycle agreement.
+			"initially in the Proposed state",
+			"update the record and its row together",
+			"successor must be accepted before the predecessor is marked Superseded",
+			"preserve the predecessor's rationale unchanged",
+			"never retires an accepted decision",
+			"COMMON DEFAULT, never a COMMON MUST",
+		},
+		".agents/context/templates/project/decision.md": {
+			"initially Proposed",
+			"update the register row in the same change",
+			"only after the successor is accepted",
+			"preserve the predecessor's rationale unchanged",
+			"COMMON DEFAULT, never a COMMON MUST",
+		},
+	}
+	for path, wants := range anchors {
+		c, ok := byPath[path]
+		if !ok {
+			t.Errorf("%s not rendered", path)
+			continue
+		}
+		for _, want := range wants {
+			if !strings.Contains(c, want) {
+				t.Errorf("%s lacks anchor %q", path, want)
 			}
 		}
 	}

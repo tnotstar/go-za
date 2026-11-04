@@ -9,6 +9,7 @@ Summary: The scoped authority map for this project. Each subject has at most one
 | API contract | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
 | Database/schema | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
 | Configuration keys/defaults | <discover: authority or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
+| Architectural constraints | <discover: `<project-id>` repository, this private context, or not applicable> | <discover: actual path or not applicable> | <discover: revision or date> |
 | Go dependencies | `<project-id>` repository | `<project-id>/go.mod` | <discover: `<project-id>/go.sum` or not applicable> |
 | Python dependencies | <discover: `<project-id>` repository or not applicable> | <discover: `<project-id>/pyproject.toml` or not applicable> | <discover: `<project-id>/uv.lock` or not applicable> |
 | Cargo dependencies | <discover: `<project-id>` repository or not applicable> | <discover: `<project-id>/Cargo.toml` or not applicable> | <discover: `<project-id>/Cargo.lock` or not applicable> |
@@ -22,6 +23,8 @@ Summary: The scoped authority map for this project. Each subject has at most one
 ## Rules
 
 - Authority is scoped: different subjects may have different authoritative sources without duplication. A local copy never silently becomes a competing specification; link to the authority instead of restating it.
+- Project-owned constraints live in the project repository at the location this table names; private rationale and private decisions live in this context under `adr.md` and `decisions/`. Never keep a second copy of a constraint another location owns: link it, and follow mandatory COMMON boundaries either way.
+- `not applicable` records a genuinely absent scope; `unresolved` means discovery has not happened yet. They are different states; never fill one with the other.
 - An entry without evidence stays `unresolved`. A scope needed for the task is resolved before implementation: record what is missing, never a guess.
 - Transferring or replacing an authority is the scope owner's change: replace the mapping row and record the evidence in the same review. Superseded locations move into the Evidence column; two active authorities for one scope are always an error.
 - A detected specification is a candidate only: detection never confers authority until the owning review confirms it.

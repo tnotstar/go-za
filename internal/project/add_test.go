@@ -359,8 +359,8 @@ func TestAddRealGitSuccess(t *testing.T) {
 			if !strings.Contains(status, "- Pinned gitlink: `"+pubHead+"`") {
 				t.Errorf("status.md lacks the pinned gitlink:\n%s", status)
 			}
-			if !strings.Contains(status, "- Context verified: pending (registration observed the pin; no review has confirmed it)") {
-				t.Errorf("status.md does not mark context verification pending:\n%s", status)
+			if !strings.Contains(status, "- Verification summary: pending (no scope verified; registration observed the pin)") {
+				t.Errorf("status.md does not mark verification pending for every scope:\n%s", status)
 			}
 			if strings.Contains(status, "OpenSpec bootstrap pending") {
 				t.Errorf("status.md uses the retired OpenSpec-pending convention:\n%s", status)
@@ -741,7 +741,7 @@ func TestRenderContextPreservesUserContent(t *testing.T) {
 			"| Observable behavior (proposed) | <discover: proposed behavior authority> | <discover: proposed behavior location> | <discover: revision or date> |\n" +
 			"| Go dependencies | `<project-id>` repository | `<project-id>/go.mod` | <discover: `<project-id>/go.sum` or not applicable> |\n" +
 			"| Go integration overlay | private meta-repository | <discover: `/go.work` or not applicable> | <discover: revision or date> |\n"),
-		"status.md": []byte("# Project Status: <project-id>\n\n- Phase: <decide: bootstrap | active-development | maintenance>\n- Pin observed: YYYY-MM-DD\n- Pinned gitlink: `<full-submodule-SHA>`\n\n## Known issues\n\n- none\n\n## Next steps\n\n- <decide: at most three concrete items>\n"),
+		"status.md": []byte("# Project Status: <project-id>\n\n- Phase: <decide: bootstrap | active-development | maintenance>\n- Pin observed: YYYY-MM-DD\n- Pinned gitlink: `<full-submodule-SHA>`\n- Verification summary: <decide: derived from the verification record; pending while no scope is verified>\n\n## Known issues\n\n- none\n\n## Next steps\n\n- <decide: at most three concrete items>\n"),
 		"tools.md":  []byte("# Tools: <project-id>\n\n| OpenSpec | <discover: yes/no> | <discover: CLI / agent skill / not adopted> |\n| Go | <discover: yes/no> | <discover: version source and invocation> |\n"),
 	}
 	for _, openspec := range []bool{false, true} {

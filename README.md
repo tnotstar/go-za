@@ -238,10 +238,14 @@ GOWORK=<workspace>/go.work go work use ./<project-id>
    are filled in: the project ID and paths, Go as language, the root
    `go.work` membership, the bootstrap phase, the date the pin was observed
    and the exact gitlink SHA as `Pinned gitlink` in `status.md`.
-   Registering does **not** mark the context as verified: `status.md`
-   records `Context verified: pending` until someone actually reviews the
-   context against that revision. Everything else stays a `<discover: ...>`
-   or `<decide: ...>` placeholder; no decisions or authorities are invented.
+   Registering does **not** mark anything verified: `status.md` records
+   `Verification summary: pending (no scope verified; registration observed
+   the pin)`. Verification is scoped: each verified scope records the
+   reviewed revision, reviewer, date and evidence in the verification
+   record, the summary is derived from those rows, and a verified scope
+   supports work while unrelated scopes stay pending. Everything else stays
+   a `<discover: ...>` or `<decide: ...>` placeholder; no decisions or
+   authorities are invented.
 5. Adds the project route to the region between `<!-- za:projects:start -->`
    and `<!-- za:projects:end -->` in `AGENTS.md`, sorted by project ID. The
    rest of the file is not touched. Missing, duplicated or hand-edited markers
@@ -425,6 +429,11 @@ a fake command runner; the `za project add` tests also run the real `git` and
 The repository forces LF line endings through `.gitattributes`. Templates are
 embedded byte-for-byte and golden tests compare exact bytes, so do not
 override this with `core.autocrlf` settings.
+
+Every embedded template carries the uniform `.tmpl` suffix, including the
+root guide `AGENTS.md.tmpl` (rendered to `AGENTS.md`); `internal/tmpl` owns
+that convention: a file without the suffix is an error, and a template
+referencing a field the caller does not provide fails the render.
 
 ## License
 

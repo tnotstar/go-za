@@ -36,7 +36,7 @@
 
 ## Lifecycle
 
-- Copy this file into `decisions/` under a stable ID; it, not a chat or an issue, is the record.
-- Edit the record during review; record acceptance or rejection with the approver, date, trade-offs and verification, then add the register row in `adr.md`.
-- Changing an accepted decision requires a successor: link both records (`Supersedes` and `Superseded by`) and set this record's status to Superseded.
-- An accepted decision may override a global DEFAULT, never a global MUST, and never redeclares observable behavior; behavior authority changes go through `sot.md`.
+- Copy this file into `decisions/` under a stable ID and create its register row in `adr.md`, initially Proposed; this record, not a chat or an issue, is the decision.
+- Edit the record during review; on acceptance or rejection record the approver and date here, and update the register row in the same change. The record owns the rationale, trade-offs and verification approach.
+- Replacing an accepted decision requires an accepted successor: link both records reciprocally (`Supersedes` and `Superseded by`), mark the predecessor Superseded only after the successor is accepted, and preserve the predecessor's rationale unchanged.
+- An accepted decision may override a COMMON DEFAULT, never a COMMON MUST, and never redeclares observable behavior; scoped authority changes go through `sot.md` with their approval evidence, linking this record when the transfer is a consequential architectural choice.

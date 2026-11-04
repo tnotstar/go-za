@@ -9,23 +9,27 @@ Summary: <decide: one sentence describing this project's responsibility>
 - Decisions: [adr.md](adr.md) with records under `decisions/`
 - Observed state and verification: [status.md](status.md)
 
+Checkout, task-worktree and integration paths above and below are workspace-relative. Markdown links resolve against this guide's own directory.
+
 ## Route the task
 
 | Question | Open |
 |---|---|
 | Which authority governs the affected requirement? | `sot.md`, then the named authority |
+| Which architectural constraints apply, and where do they live? | the architectural-constraints row of `sot.md`, then that location |
 | Which commands validate the change, in which directory and mode? | `tools.md` |
 | Does an accepted decision constrain the change? | `adr.md`, then the linked record under `decisions/` |
-| What is the observed pin and is verification pending? | `status.md` |
+| What is the observed pin, and which scopes are verified? | `status.md` |
 
 Load only the documents this task needs; resolve relative references against this guide's own directory.
 
 ## Before source work
 
-1. Identify the intended base: the pinned gitlink (`git ls-files -s <project-id>` from the workspace root), the canonical checkout `HEAD` and the task base you intend to build on. Upstream advancement is routine; record material divergence instead of synchronizing anything.
-2. Work in a task worktree under `.worktrees/<project-id>/<task-id>/`. Search the active worktree; never walk the worktree collection.
-3. Check [status.md](status.md): a pending verification, or an `unresolved` authority in an affected scope of `sot.md`, stops the write for that scope until resolved.
+1. Establish the intended task base: the pinned gitlink (`git ls-files -s <project-id>` from the workspace root), the canonical checkout `HEAD` and the base you intend to build on. Upstream advancement and upstream information that is unavailable are recorded as material divergence; neither stops the task by itself.
+2. Inspect local changes and compare the task worktree with that base. Project-source changes happen in a task worktree under `.worktrees/<project-id>/<task-id>/`; recursive search stays inside that worktree, never the whole `.worktrees/` collection.
+3. Assess the verification evidence for the affected scope in [status.md](status.md): a verified scope supports work while unrelated scopes stay pending. Pause only dependent implementation when the task base is ambiguous, the affected scope's authority in [sot.md](sot.md) is `unresolved` or the evidence is insufficient; investigation and context maintenance that close those gaps proceed normally.
+4. Read the architectural constraints identified in [sot.md](sot.md) and the relevant accepted decisions in [adr.md](adr.md) before design or source changes.
 
 ## Stop when
 
-The affected authority, the applicable commands and validation mode, the decision boundary and the target area are known.
+The affected authority, the applicable constraints and commands with their validation mode, the decision boundary and the target area are known.

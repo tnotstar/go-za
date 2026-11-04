@@ -123,9 +123,11 @@ func contextEdits(f facts) []edit {
 		{"status.md", "- Phase: <decide: bootstrap | active-development | maintenance>", "- Phase: bootstrap"},
 		{"status.md", "- Pin observed: YYYY-MM-DD", "- Pin observed: " + f.Date},
 		{"status.md", "- Pinned gitlink: `<full-submodule-SHA>`", "- Pinned gitlink: `" + f.Gitlink + "`"},
+		{"status.md", "- Verification summary: <decide: derived from the verification record; pending while no scope is verified>",
+			"- Verification summary: pending (no scope verified; registration observed the pin)"},
 		{"status.md", "## Known issues\n\n- none\n", "## Known issues\n\n" + strings.Join([]string{
 			"- Context bootstrap incomplete: `tools.md` and `sot.md` still hold discovery and decision placeholders.",
-			"- Context verification is pending: the recorded pin has not been reviewed.",
+			"- Context verification is pending: no scope has been verified against the recorded pin.",
 		}, "\n") + "\n"},
 		{"status.md", "- <decide: at most three concrete items>", strings.Join([]string{
 			"- Resolve the placeholders in `tools.md` and `sot.md` from the project repository.",

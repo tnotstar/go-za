@@ -1,15 +1,14 @@
 # Decision Register: pub
 
-Summary: The complete index of this project's decision records under `decisions/`. Every decision gets exactly one row here and one record file there; open a record by its linked ID instead of reconstructing it from this register.
+Summary: The navigation index of this project's decision records under `decisions/`. Every decision gets exactly one row here and one record file there; open a record by its linked ID instead of reconstructing it from this register.
 
 | ID | Title | Status | Supersedes | Record |
 |---|---|---|---|---|
 
 ## Register rules
 
-- Add one row when the record file is created; the record under `decisions/` is the authority for the decision's content.
-- Status mirrors the record: Proposed, Accepted, Rejected or Superseded.
-- Acceptance or rejection records the approver, date, trade-offs and verification in the record itself.
-- Changing an accepted decision requires a successor record: the successor lists this ID as `Supersedes`, the predecessor lists the successor as `Superseded by`, and the predecessor's status becomes Superseded. Superseded records stay unchanged apart from the status and the link.
-- An accepted decision may override a global DEFAULT, never a global MUST, and never redeclares observable behavior; behavior authority changes go through `sot.md`.
-- Transferring a requirement authority is not a decision by itself: replace the mapping in `sot.md` and record the evidence in the same review.
+- Create the row when the record is created, initially in the Proposed state; update the record and its row together whenever the decision is accepted, rejected or superseded.
+- The record under `decisions/` owns the rationale, trade-offs and verification approach; acceptance or rejection records the responsible approver and date there. This register is a navigation aid.
+- Replacing an accepted decision: the successor must be accepted before the predecessor is marked Superseded. Link both records reciprocally (`Supersedes` and `Superseded by`) and preserve the predecessor's rationale unchanged. A proposed or rejected successor never retires an accepted decision.
+- An accepted decision may override a COMMON DEFAULT, never a COMMON MUST, and never redeclares observable behavior; behavior authority changes go through `sot.md`.
+- Scoped authority changes stay in `sot.md` with their approval evidence. Link a decision record when an authority transfer involves a consequential architectural choice.

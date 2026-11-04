@@ -5,7 +5,7 @@ Summary: Observed execution state, not authority. Nothing here overrides `sot.md
 - Phase: <decide: bootstrap | active-development | maintenance>
 - Pin observed: YYYY-MM-DD
 - Pinned gitlink: `<full-submodule-SHA>`
-- Context verified: pending (registration observed the pin; no review has confirmed it)
+- Verification summary: <decide: derived from the verification record; pending while no scope is verified>
 
 ## In progress
 
@@ -21,7 +21,18 @@ Summary: Observed execution state, not authority. Nothing here overrides `sot.md
 
 ## Verification record
 
-Marking context verified requires an entry naming all of: the reviewed scope, the revision it was reviewed against, the reviewer, the date and the evidence. A changed basis — pin, authority or context content — reopens verification for the affected scope.
+One row per verification event. The summary above is derived from these rows and never overrides them.
 
-| Verified scope | Revision | Reviewer | Date | Evidence |
+| Verified scope | Reviewed revision | Reviewer | Date | Evidence |
 |---|---|---|---|---|
+
+How verification works:
+
+- Registration records the observed pin and leaves every scope pending.
+- A verified scope supports work on that scope while unrelated scopes stay pending.
+- Recording a verification names the scope, reviewed revision, reviewer, date and evidence. Matching SHAs alone are not evidence.
+- A change to the relevant basis — the pin, an authority in `sot.md`, or verified context content — triggers reassessment of the affected scope only.
+- Coordination text (phase, in progress, next steps) does not invalidate technical verification.
+- On reassessment, keep the previous row as prior evidence and add the new row; distinguish prior evidence from evidence applicable to the current task.
+
+Update this file when a material fact changes: phase, a blocker appearing or clearing, the next action, a newly observed pin, or a verification change. Leave it unchanged otherwise.

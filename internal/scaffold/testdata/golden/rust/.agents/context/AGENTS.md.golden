@@ -16,7 +16,7 @@ Read [policy.md](policy.md) first. Its MUST rules bind every project and every a
 
 ## Projects
 
-Project context lives at `.agents/context/<project-id>/AGENTS.md`. Registered projects are routed from the managed region of the root `AGENTS.md`; this guide never duplicates that list. Load a project's guide only once the task selects that project, and never load sibling project context.
+Project context lives at `.agents/context/<project-id>/AGENTS.md`. Registered projects are routed from the managed region of the root `AGENTS.md`; this guide never duplicates that list. A task may expressly include several projects: load the guide of every project the task names, in turn, and never read the context of a project the task does not name.
 
 ## Issues
 
@@ -24,7 +24,7 @@ Workspace and cross-project issues live under `issues/` when present, one Markdo
 
 ## GLOBAL
 
-GLOBAL preferences are personal settings owned by the user's coding tool, outside this workspace. They are optional, user-managed, and never discovered, provisioned or modified here; COMMON policy and project authorities apply regardless of personal settings.
+GLOBAL preferences are optional personal instructions the developer configures in their coding tool, outside this workspace. Agents may receive and follow them through the tool's supported loading mechanisms. This workspace neither requires, provisions, modifies nor recursively inspects personal configuration, and it functions with an empty personal profile. Applicable project settings and mandatory COMMON rules govern their respective scopes; surface material instruction conflicts for resolution instead of resolving them silently.
 
 ## Stop reading when
 

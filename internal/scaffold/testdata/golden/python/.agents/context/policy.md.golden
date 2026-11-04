@@ -11,7 +11,7 @@ Every rule in this file is a MUST.
 
 ## Repository boundary
 
-- P-01 Private AI context lives only under `.agents/context/` in this private meta-repository.
+- P-01 Private context owned by this workspace lives only under `.agents/context/` in the private meta-repository. GLOBAL personal instructions belong to the developer's coding tool and are never workspace content.
 - P-02 Top-level project directories registered in `.gitmodules` are independent project repositories. Registration does not determine their visibility; private context never goes inside them.
 - P-03 Requirement artifacts in a project repository stand on their own: they never reference or depend on `.agents/context/`.
 - P-04 A project repository remains understandable, buildable and testable without this meta-repository.
@@ -26,16 +26,16 @@ Every rule in this file is a MUST.
 
 ## Context levels
 
-- P-10 COMMON context is the set of direct files under `.agents/context/`, owned by the workspace maintainers. PROJECT context is `.agents/context/<id>/`. GLOBAL preferences are external to the workspace: optional, owned by the user's coding tool, and never discovered, provisioned or modified by `za` or by agents. Personal preferences are defaults; COMMON boundaries, project formatter settings and CI apply to the work they govern.
+- P-10 COMMON context is the set of direct files under `.agents/context/`, owned by the workspace maintainers. PROJECT context is `.agents/context/<id>/`. GLOBAL preferences are optional personal instructions the developer configures in their coding tool; agents may receive and follow them through that tool's supported loading mechanisms. Workspace initialization and management neither requires, provisions, modifies nor recursively inspects personal configuration, and this workspace functions with an empty personal profile. Applicable project settings and mandatory COMMON rules govern their respective scopes; a material conflict between personal instructions and applicable rules is surfaced for resolution, never resolved silently.
 - P-11 Work with one active project unless the task is explicitly multi-project. A multi-project task processes project contexts sequentially and never assumes one project's defaults apply to the next.
 - P-12 A project context is understandable from COMMON, that project's private context, that project's repository and its declared authoritative references alone. It never requires, and is never authoritative for, another project.
 - P-13 When switching projects, retain only COMMON context and load the new project from zero.
 
 ## Execution state
 
-- P-14 Task worktrees under `.worktrees/<id>/<task-id>/` are execution state, not context and not additional projects. Inspect only the active one; never scan `.worktrees/` recursively.
-- P-15 Normal writable work happens in a task worktree created from the pinned gitlink or an explicitly verified revision, not in the canonical checkout.
-- P-16 A normal write task stops when upstream freshness or context verification is stale or pending. When freshness cannot be established, say so; never claim it.
+- P-14 Task worktrees under `.worktrees/<id>/<task-id>/` are execution state, not context and not additional projects. Recursive search is allowed inside the selected task worktree; never traverse the `.worktrees/` collection recursively.
+- P-15 Project-source changes happen in a task worktree created from the pinned gitlink or an explicitly verified revision, not in the canonical checkout. Workspace policy, private context, scaffolding and root integration changes belong in the meta-repository.
+- P-16 Before dependent implementation, establish the intended task base, inspect local changes and assess the verification evidence for the affected scope. Upstream advancement, unavailable upstream information or pending verification in an unrelated scope does not independently block a task. Pause only dependent implementation whose task base is ambiguous, whose requirement authority is unresolved or whose evidence is insufficient; investigation and context maintenance that close those gaps proceed normally. Report material divergence and freshness that could not be established; never claim freshness that was not verified, and never synchronize a pin, reset a checkout or update a gitlink to make the evidence match.
 - P-17 Remove task worktrees through Git (`git worktree remove`, then `git worktree prune`). Never run destructive `git clean` over `.worktrees/`.
 
 ## Authority
@@ -43,7 +43,7 @@ Every rule in this file is a MUST.
 - P-18 Every requirement scope has at most one declared authority, recorded in the project's `sot.md`; a scope needed for implementation must have exactly one. Physical location, format and recency never confer authority by themselves.
 - P-19 Unresolved requirement authority that affects implementation is surfaced before that implementation proceeds, never guessed around.
 - P-20 Observable behavior: the declared authority for the scope (an assigned OpenSpec change, current OpenSpec spec, another tracker, or a privately authoritative specification) > implementation > private notes. A detected specification is a candidate until the owning review confirms it.
-- P-21 Technical architecture: global MUST > accepted project decision > global DEFAULT. A decision never overrides a MUST and never redeclares observable behavior; behavior authority changes go through `sot.md`.
+- P-21 Technical architecture: COMMON MUST > accepted project decision > COMMON DEFAULT. A decision never overrides a COMMON MUST and never redeclares observable behavior; behavior authority changes go through `sot.md`.
 - P-22 Dependencies: project dependency files > private workspace overlays.
 - P-23 `status.md` is informational only and never overrides specifications, rules or issue records.
 - P-24 When code and the declared requirement disagree, determine which is stale and repair that source of truth. Never silently normalize the requirement to the code.

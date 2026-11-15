@@ -17,6 +17,8 @@ projects may be public, client-private or otherwise restricted.
 |---|---|
 | `za init` | Initializes an empty directory as a meta-workspace |
 | `za project add` | Adds one root-module Go repository as a project (first minimal version) |
+| `za issue` | Manages the workspace issue records in `.za/issues/` |
+| `za board` | Renders the Kanban view of the workspace issues |
 | `za version` | Prints the version of the executable and its build provenance |
 
 `za` creates no worktrees, installs no hooks and never calls GitHub or any
@@ -279,6 +281,75 @@ with the same command. If rollback cannot complete, `za` says what is left.
 
 Exit status follows `za init`: `0` success, `1` operational failure, `2`
 invalid usage.
+
+## `za issue`
+
+```text
+za issue add [flags] "<title>" | "<raw todo.txt line>"
+za issue new [flags] "<title>" | "<raw todo.txt line>"
+za issue ls [flags]
+za issue show <ID>
+za issue move <ID> <todo|doing|done> [-commit <sha>]
+```
+
+Issues live as flat records in `.za/issues/`: one Markdown file
+`I-NNNNNN.md` per issue whose first line is a canonical todo.txt record and
+whose body holds the lightweight XP sections (grammar and template:
+`.za/templates/issue.md`). The state lives on the first line
+(`@todo`, `@doing`, `@done`); listing, board rendering and state moves read
+and rewrite only that line, and the Markdown body is never rewrapped. Line
+2 must stay blank.
+
+- `add` allocates the next sequential ID (`I-000001` when the directory
+  holds no records yet, otherwise the highest existing number plus one,
+  failing closed at `I-999999`), writes the record with the built-in
+  skeleton body, and prints `<ID> .za/issues/I-NNNNNN.md`. Flags:
+  `-p <A-Z>` (default `B`), `-project <id>` (repeatable or
+  comma-separated; default `+workspace`; any other project must be
+  registered in `.gitmodules` or exist as a top-level directory of the
+  workspace), `-status <todo|doing>` (default `todo`), `-spec <wiki-path>`,
+  `-adr <D-NNNN>`.
+- `new` is identical except that the initial body comes from the
+  workspace's own `.za/templates/issue.md` when present (its first line,
+  the grammar placeholder, is dropped), falling back to the built-in
+  skeleton.
+- If the argument parses as a raw todo.txt line (priority, date, title,
+  `+project` and `@status` tags, without `id:`), it is used as the record
+  line and only the ID is allocated. A raw line cannot be combined with
+  flags.
+- `ls` prints tab-separated single lines
+  `<ID>  <Status>  <Priority>  <Created>  <Projects>  <Title>` sorted by
+  priority (`A`..`Z`, unprioritized last), then status (`@doing` before
+  `@todo` before `@done`), then ID. Filters: `-status
+  <active|todo|doing|done|all>` (default `active`), `-project <id>`,
+  `-priority <A-Z>`. Only the first lines of the records are read.
+- `show` prints the full record; the ID accepts `I-NNNNNN` or a numeric
+  shorthand (`4`, `000004`).
+- `move` rewrites the first line atomically (same-directory rename) while
+  preserving the body byte for byte. Moving to `done` sets the completion
+  date to today (UTC) and records `-commit` when given; reopening strips
+  the completion prefix and the landing commit. The rewritten line is
+  serialized canonically, so its tag order may change.
+
+All dates are UTC. Every malformed record — a first line that violates the
+grammar, an `id:` tag that does not match the file name, a non-blank line
+2 — fails the command loudly instead of being skipped, and `za issue`
+never touches anything outside the workspace's `.za/` directory.
+
+Exit status: `0` success, `1` operational failure (outside a workspace,
+missing `.za/issues/`, malformed or missing record, exhausted ID space),
+`2` invalid usage.
+
+## `za board`
+
+```text
+za board [-project <id>]
+```
+
+Renders the plain-text Kanban view of `.za/issues/`: three sections
+(`DOING`, `TODO`, `DONE`), each row showing ID, priority, `+projects` and
+title, sorted by priority and ID. The output carries no ANSI escapes and is
+deterministic byte for byte.
 
 ## `za version`
 

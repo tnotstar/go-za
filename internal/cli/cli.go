@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tnotstar/go-za/internal/initcmd"
+	"github.com/tnotstar/go-za/internal/issue"
 	"github.com/tnotstar/go-za/internal/project"
 	"github.com/tnotstar/go-za/internal/tool"
 	"github.com/tnotstar/go-za/internal/version"
@@ -30,6 +31,8 @@ Usage:
 Commands:
   init     Initialize an empty directory as a za meta-workspace
   project  Manage the projects of a za workspace
+  issue    Manage the workspace issues (.za/issues/)
+  board    Show the Kanban board of the workspace issues
   version  Print the version of the za executable
 
 Run "za <command> --help" for details about a command.
@@ -72,6 +75,10 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, env Env) 
 		return runInit(ctx, args[1:], stdout, stderr, initcmd.Env{Runner: env.Runner, Getwd: env.Getwd})
 	case "project":
 		return runProject(ctx, args[1:], stdout, stderr, project.Env{Runner: env.Runner, Getwd: env.Getwd, Now: env.Now})
+	case "issue":
+		return runIssue(ctx, args[1:], stdout, stderr, issue.Env{Getwd: env.Getwd, Now: env.Now})
+	case "board":
+		return runBoard(ctx, args[1:], stdout, stderr, issue.Env{Getwd: env.Getwd, Now: env.Now})
 	case "version":
 		return runVersion(args[1:], stdout, stderr)
 	default:
@@ -135,6 +142,186 @@ func runProjectAdd(ctx context.Context, args []string, stdout, stderr io.Writer,
 	}
 	fmt.Fprint(stdout, res.Summary())
 	return ExitOK
+}
+
+// runIssue dispatches the "za issue" subcommands. The commands perform pure
+// file operations on the workspace's .za/issues/ records, so they need no
+// native command runner and no context.
+func runIssue(_ context.Context, args []string, stdout, stderr io.Writer, env issue.Env) int {
+	if len(args) == 0 {
+		fmt.Fprint(stderr, issue.Usage)
+		return ExitUsage
+	}
+	switch args[0] {
+	case "-h", "-help", "--help", "help":
+		fmt.Fprint(stdout, issue.Usage)
+		return ExitOK
+	case "add":
+		return runIssueAdd(args[1:], stdout, stderr, env, issue.DefaultBody, issue.AddUsage)
+	case "new":
+		return runIssueNew(args[1:], stdout, stderr, env)
+	case "ls":
+		return runIssueLs(args[1:], stdout, stderr, env)
+	case "show":
+		return runIssueShow(args[1:], stdout, stderr, env)
+	case "move":
+		return runIssueMove(args[1:], stdout, stderr, env)
+	default:
+		fmt.Fprintf(stderr, "error: unknown issue command %q\nRun \"za issue --help\" for usage.\n", args[0])
+		return ExitUsage
+	}
+}
+
+// runIssueAdd implements "za issue add": the fast path with the built-in
+// skeleton body.
+func runIssueAdd(args []string, stdout, stderr io.Writer, env issue.Env, body, usage string) int {
+	req, err := issue.ParseAddArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, usage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "issue")
+	}
+	root, err := env.Root()
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	created, err := issue.Add(root, req, body, env.Now())
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	fmt.Fprintf(stdout, "%s %s\n", created.ID, issue.RecordPath(created.ID))
+	return ExitOK
+}
+
+// runIssueNew implements "za issue new": the template-backed initializer.
+func runIssueNew(args []string, stdout, stderr io.Writer, env issue.Env) int {
+	req, err := issue.ParseNewArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, issue.AddUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "issue")
+	}
+	root, err := env.Root()
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	body, err := issue.TemplateBody(root)
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	created, err := issue.Add(root, req, body, env.Now())
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	fmt.Fprintf(stdout, "%s %s\n", created.ID, issue.RecordPath(created.ID))
+	return ExitOK
+}
+
+// runIssueLs implements "za issue ls".
+func runIssueLs(args []string, stdout, stderr io.Writer, env issue.Env) int {
+	opts, err := issue.ParseLsArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, issue.LsUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "issue")
+	}
+	root, err := env.Root()
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	issues, err := issue.ScanSummaries(issue.IssuesDir(root))
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	issues = issue.Filter(issues, opts.Status, opts.Project, opts.Priority)
+	issue.SortByPriorityStatusID(issues)
+	fmt.Fprint(stdout, issue.RenderList(issues))
+	return ExitOK
+}
+
+// runIssueShow implements "za issue show".
+func runIssueShow(args []string, stdout, stderr io.Writer, env issue.Env) int {
+	opts, err := issue.ParseShowArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, issue.ShowUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "issue")
+	}
+	root, err := env.Root()
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	data, err := issue.ReadRecord(issue.IssuesDir(root), opts.ID)
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	if _, werr := stdout.Write(data); werr != nil {
+		return failureExit(stderr, werr)
+	}
+	return ExitOK
+}
+
+// runIssueMove implements "za issue move" and prints the rewritten first
+// line.
+func runIssueMove(args []string, stdout, stderr io.Writer, env issue.Env) int {
+	opts, err := issue.ParseMoveArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, issue.MoveUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "issue")
+	}
+	root, err := env.Root()
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	iss, err := issue.Move(issue.IssuesDir(root), opts.ID, opts.To, opts.Commit, env.Now())
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	fmt.Fprintln(stdout, issue.Serialize(iss))
+	return ExitOK
+}
+
+// runBoard implements "za board".
+func runBoard(_ context.Context, args []string, stdout, stderr io.Writer, env issue.Env) int {
+	opts, err := issue.ParseBoardArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, issue.BoardUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "board")
+	}
+	root, err := env.Root()
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	issues, err := issue.ScanSummaries(issue.IssuesDir(root))
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	fmt.Fprint(stdout, issue.Board(issue.Filter(issues, "all", opts.Project, 0)))
+	return ExitOK
+}
+
+func usageExit(stderr io.Writer, err error, command string) int {
+	fmt.Fprintf(stderr, "error: %v\nRun \"za %s --help\" for usage.\n", err, command)
+	return ExitUsage
+}
+
+func failureExit(stderr io.Writer, err error) int {
+	fmt.Fprintf(stderr, "error: %v\n", err)
+	return ExitFailure
 }
 
 // runVersion prints the executable's build identity. It uses no process

@@ -6,8 +6,14 @@ Summary: Shared tool conventions and the integration behavior of the enabled lan
 
 - `za` is the canonical command for managing this workspace's architecture.
 - It replaces hand-written management scripts: never add shell, Python or Make scripts under `.agents/` that duplicate workspace-management behavior.
-- Available: `za init`, already applied to this workspace, and `za project add <repo-url>`, which registers a root-module Go project as a submodule and creates its private context.
-- Until a `za` subcommand covers a task (project removal or synchronization, checking drift, creating or removing worktrees), perform it with the native tools below, following `policy.md`.
+- Available: `za init`, already applied to this workspace, `za project add <repo-url>`, which registers a root-module Go project as a submodule and creates its private context, and `za version`, which reports the executable's build provenance.
+- Until a `za` subcommand covers a task (issue and wiki management, project removal or synchronization, checking drift, creating or removing worktrees), perform it with the native tools below, following `policy.md`.
+
+## Workspace `.za/` artifacts
+
+- `.za/issues/`, `.za/wiki/` and `.za/templates/` are workspace-owned private artifacts at the workspace root, recognized by `policy.md` (P-01, P-20) alongside `.agents/context/`.
+- Issues carry their state on the canonical todo.txt first line (`.za/templates/issue.md`); wiki pages follow `.za/templates/wiki.md`, with navigation starting at `.za/wiki/index.md`.
+- Until `za` gains issue and wiki commands, create and edit these files by hand; never add scripts under `.agents/` that duplicate that planned behavior.
 
 ## Native tools
 

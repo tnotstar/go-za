@@ -235,7 +235,8 @@ GOWORK=<workspace>/go.work go work use ./<project-id>
 4. Creates the private context `.agents/context/<project-id>/` from the
    workspace's own templates in `.agents/context/templates/project/`: the
    project guide `AGENTS.md`, `sot.md`, `status.md`, `tools.md`, the empty
-   decision register `adr.md`, and an empty `decisions/`. Only known facts
+   decision register `adr.md`, an empty `decisions/`, and the execution log
+   `status.log` seeded with the registration entry. Only known facts
    are filled in: the project ID and paths, Go as language, the root
    `go.work` membership, the bootstrap phase, the date the pin was observed
    and the exact gitlink SHA as `Pinned gitlink` in `status.md`.
@@ -317,14 +318,16 @@ version and the `vcs.revision`, `vcs.time` and `vcs.modified` settings.
   Every supported build path (`go build`, `make build`, `make install`,
   `go install ...@version`) stamps the same metadata automatically.
 - Classification precedence: a build whose source had **uncommitted
-  modifications** (`vcs.modified=true`, or the version string carries a
-  `+dirty` suffix) is a **development build**, however the toolchain named
-  the version — current Go stamps local builds as a pseudo-version of HEAD
-  with `+dirty` rather than the literal `(devel)`. Otherwise `(devel)` is a
-  development build, a pseudo-version shape is a `Go pseudo-version`, and a
-  tagged semantic version is a `release`. A local untagged build therefore
-  stays identifiable as a development build while its source is modified,
-  and a clean tree is reported as the exact pseudo-version of its commit.
+  modifications** (`vcs.modified=true`) is a **development build**, however
+  the toolchain named the version — current Go stamps local builds as a
+  pseudo-version of HEAD with `+dirty` rather than the literal `(devel)`.
+  The version string alone never decides the kind: a pseudo-version
+  carrying `+dirty` without `vcs.modified=true` stays a `Go pseudo-version`.
+  Otherwise `(devel)` is a development build, a pseudo-version shape is a
+  `Go pseudo-version`, and a tagged semantic version is a `release`. A local
+  untagged build therefore stays identifiable as a development build while
+  its source is modified, and a clean tree is reported as the exact
+  pseudo-version of its commit.
 - When VCS stamping is unavailable — a build outside a Git checkout, or with
   `-buildvcs=false` — the revision line reports it explicitly as
   unavailable. `za` never invents values.
@@ -357,11 +360,16 @@ the added `version` line.
 │   │   ├── AGENTS.md        common guide (routes to mandatory policy and topics)
 │   │   ├── policy.md        COMMON policy: MUST rules for the whole workspace
 │   │   ├── tooling.md       COMMON tooling: integration constraints per capability
-│   │   ├── templates/project/   PROJECT context templates
-│   │   ├── templates/issue.md   issue template (issue commands come later)
+│   │   ├── templates/project/   PROJECT context templates, including status.log
 │   │   └── <project-id>/    PROJECT contexts (created by za project add)
 │   ├── hooks/{meta,public}/ reserved for future hook management
 │   └── runtime/             local, ignored
+├── .za/                     workspace issues, wiki and templates (XP workflow)
+│   ├── issues/              flat I-NNNNNN.md issues (canonical todo.txt first line)
+│   ├── wiki/                private specification and knowledge pages
+│   │   ├── index.md         wiki navigation root
+│   │   └── img/             optional assets
+│   └── templates/           canonical issue and wiki page templates
 └── .worktrees/              local, ignored
 ```
 
@@ -381,9 +389,14 @@ governs this change?). The common guide routes to the mandatory
 `policy.md` and to `tooling.md`, which documents integration behavior only
 for the languages you select. It never duplicates the project list (that is
 derived from `.gitmodules`) and never embeds issue bodies. Leaf collections
-such as issues and decisions are reached by ID or reference. Project IDs
-must not collide with context infrastructure names; `za project add`
-rejects reserved names and case-equivalent collisions.
+such as issues and decisions are reached by ID or reference. The `.za/`
+layer at the workspace root holds the workspace's issues (`.za/issues/`,
+flat `I-NNNNNN.md` files whose first line is a canonical todo.txt record),
+its private specification wiki (`.za/wiki/`) and the canonical templates
+for both (`.za/templates/`). Project IDs must not collide with context
+infrastructure names; `za project add` rejects reserved names and
+case-equivalent collisions, including hidden dot-prefixed names such as
+`.za` or `.agents`.
 
 > **`.worktrees/` is ignored for hygiene, not confidentiality.** Private
 > context stays private because it lives in the private meta-repository,

@@ -11,7 +11,7 @@ Every rule in this file is a MUST.
 
 ## Repository boundary
 
-- P-01 Private context owned by this workspace lives only under `.agents/context/` in the private meta-repository. GLOBAL personal instructions belong to the developer's coding tool and are never workspace content.
+- P-01 Private context owned by this workspace lives only under `.agents/context/` and `.za/` in the private meta-repository: `.agents/context/` holds the guides, policies, per-project context, decisions and execution logs; `.za/` holds the workspace's private issue records (`issues/`), specification and knowledge pages (`wiki/`), and canonical templates (`templates/`). GLOBAL personal instructions belong to the developer's coding tool and are never workspace content.
 - P-02 Top-level project directories registered in `.gitmodules` are independent project repositories. Registration does not determine their visibility; private context never goes inside them.
 - P-03 Requirement artifacts in a project repository stand on their own: they never reference or depend on `.agents/context/`.
 - P-04 A project repository remains understandable, buildable and testable without this meta-repository.
@@ -42,7 +42,7 @@ Every rule in this file is a MUST.
 
 - P-18 Every requirement scope has at most one declared authority, recorded in the project's `sot.md`; a scope needed for implementation must have exactly one. Physical location, format and recency never confer authority by themselves.
 - P-19 Unresolved requirement authority that affects implementation is surfaced before that implementation proceeds, never guessed around.
-- P-20 Observable behavior: the declared authority for the scope (an assigned OpenSpec change, current OpenSpec spec, another tracker, or a privately authoritative specification) > implementation > private notes. A detected specification is a candidate until the owning review confirms it.
+- P-20 Observable behavior: the declared authority for the scope (an assigned `.za/issues/` issue, an accepted `.za/wiki/` page, an assigned OpenSpec change, a current OpenSpec spec, another tracker, or a privately authoritative specification) > implementation > private notes. A detected specification is a candidate until the owning review confirms it.
 - P-21 Technical architecture: COMMON MUST > accepted project decision > COMMON DEFAULT. A decision never overrides a COMMON MUST and never redeclares observable behavior; behavior authority changes go through `sot.md`.
 - P-22 Dependencies: project dependency files > private workspace overlays.
 - P-23 `status.md` is informational only and never overrides specifications, rules or issue records.

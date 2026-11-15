@@ -23,16 +23,17 @@ const (
 
 // contextFiles are the templates instantiated for every project. The
 // decision record template is not among them: decisions/ starts empty.
-var contextFiles = []string{"AGENTS.md", "adr.md", "sot.md", "status.md", "tools.md"}
+var contextFiles = []string{"AGENTS.md", "adr.md", "sot.md", "status.md", "status.log", "tools.md"}
 
 // facts are the only project properties za knows for certain when it adds a
 // project. Everything else stays a <discover: ...> or <decide: ...> placeholder.
 type facts struct {
-	ID       string
-	Gitlink  string // full SHA of the staged submodule gitlink
-	Date     string // YYYY-MM-DD
-	OpenSpec bool   // <id>/openspec/ exists
-	GoSum    bool   // <id>/go.sum exists
+	ID        string
+	Gitlink   string // full SHA of the staged submodule gitlink
+	Date      string // YYYY-MM-DD
+	Timestamp string // RFC 3339 UTC instant of the registration, for status.log
+	OpenSpec  bool   // <id>/openspec/ exists
+	GoSum     bool   // <id>/go.sum exists
 }
 
 // readTemplates loads the project templates of the workspace at root.
@@ -134,6 +135,11 @@ func contextEdits(f facts) []edit {
 			"- Declare the requirement authority for observable behavior in `sot.md`.",
 			"- Run the documented commands and record review evidence in `status.md`.",
 		}, "\n")},
+
+		// The execution log opens with the registration event; the instant
+		// comes from the injected clock, so the rendered context stays
+		// deterministic for golden tests.
+		{"status.log", "[<iso-8601-utc>]", "[" + f.Timestamp + "]"},
 	}
 	return edits
 }

@@ -28,4 +28,5 @@ Summary: The scoped authority map for this project. Each subject has at most one
 - An entry without evidence stays `unresolved`. A scope needed for the task is resolved before implementation: record what is missing, never a guess.
 - Transferring or replacing an authority is the scope owner's change: replace the mapping row and record the evidence in the same review. Superseded locations move into the Evidence column; two active authorities for one scope are always an error.
 - A detected specification is a candidate only: detection never confers authority until the owning review confirms it.
+- Candidate authorities for observable behavior include an accepted page of the workspace wiki (`.za/wiki/`), an assigned workspace issue (`.za/issues/`), a specification inside the repository (for example an OpenSpec spec), or another declared tracker; record whichever the owning review confirms.
 - A discrepancy between implementation and the declared authority is reported, not silently normalized. An external authority remains authoritative even when it cannot be fetched; record the gap instead of fabricating its contents.

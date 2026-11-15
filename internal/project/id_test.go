@@ -30,19 +30,24 @@ func TestDeriveID(t *testing.T) {
 	}
 
 	invalid := map[string]string{
-		"":                               "empty",
-		"/":                              "empty",
-		"https://github.com/org/.git":    "empty",
-		"https://github.com/org/..":      "not a valid directory name",
-		"https://github.com/org/.":       "not a valid directory name",
-		`C:\repos\foo`:                   "path separator",
-		"https://github.com/org/.hid":    "hidden",
-		"https://github.com/org/-rf":     "starts with",
-		"https://github.com/org/a b":     "only ASCII",
-		"https://github.com/org/a?x=1":   "only ASCII",
-		"https://github.com/org/ñu":      "only ASCII",
-		"https://github.com/org/za.toml": "reserved",
-		"https://github.com/org/go.work": "reserved",
+		"":                            "empty",
+		"/":                           "empty",
+		"https://github.com/org/.git": "empty",
+		"https://github.com/org/..":   "not a valid directory name",
+		"https://github.com/org/.":    "not a valid directory name",
+		`C:\repos\foo`:                "path separator",
+		"https://github.com/org/.hid": "hidden",
+		// Workspace-owned dot-prefixed directories are hidden names and can
+		// never be project directories.
+		"https://github.com/org/.za":        "hidden",
+		"https://github.com/org/.agents":    "hidden",
+		"https://github.com/org/.worktrees": "hidden",
+		"https://github.com/org/-rf":        "starts with",
+		"https://github.com/org/a b":        "only ASCII",
+		"https://github.com/org/a?x=1":      "only ASCII",
+		"https://github.com/org/ñu":         "only ASCII",
+		"https://github.com/org/za.toml":    "reserved",
+		"https://github.com/org/go.work":    "reserved",
 		// Reserved context names under the schema-4 flat layout.
 		"https://github.com/org/issues":     "reserved",
 		"https://github.com/org/templates":  "reserved",

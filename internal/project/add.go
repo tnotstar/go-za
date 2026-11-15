@@ -338,7 +338,7 @@ func (a *adder) preflightFiles() error {
 	// Prove the templates accept every fact combination before mutating.
 	for _, openspec := range []bool{false, true} {
 		for _, goSum := range []bool{false, true} {
-			f := facts{ID: a.id, Gitlink: strings.Repeat("0", 40), Date: "2006-01-02", OpenSpec: openspec, GoSum: goSum}
+			f := facts{ID: a.id, Gitlink: strings.Repeat("0", 40), Date: "2006-01-02", Timestamp: "2006-01-02T12:00:00Z", OpenSpec: openspec, GoSum: goSum}
 			if _, err := renderContext(a.templates, f); err != nil {
 				return err
 			}
@@ -413,7 +413,12 @@ func (a *adder) run() (Result, error) {
 			return err
 		}
 		res.Module = modulePath(filepath.Join(projectDir, "go.mod"))
-		ctxFacts = facts{ID: a.id, Gitlink: res.Gitlink, Date: a.now().Format(time.DateOnly), OpenSpec: res.OpenSpec, GoSum: goSum}
+		ctxFacts = facts{
+			ID: a.id, Gitlink: res.Gitlink,
+			Date:      a.now().Format(time.DateOnly),
+			Timestamp: a.now().UTC().Format(time.RFC3339),
+			OpenSpec:  res.OpenSpec, GoSum: goSum,
+		}
 		return nil
 	})
 	if err != nil {

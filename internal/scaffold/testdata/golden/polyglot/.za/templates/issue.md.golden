@@ -1,0 +1,46 @@
+[(A|B|C)] YYYY-MM-DD <Title> +<project-id> @todo id:I-NNNNNN [spec:<wiki-path>] [adr:D-NNNN]
+
+## Problem & Goal
+
+To be clarified.
+
+## Acceptance Criteria
+
+- AC-01: ...
+
+## Implementation & Verification Notes
+
+<!-- za issue template (.za/): copy to .za/issues/I-NNNNNN.md using the next
+free sequential ID and fill it in; the copy, not this template, is the record.
+Every <...> placeholder must be replaced before the issue is valid; a
+placeholder left in place is invalid data, never a default. Issues are reached
+by ID or reference; never load the .za/issues/ collection wholesale.
+
+LINE 1 — canonical todo.txt line (machine-readable state; line 2 is blank):
+
+  Active:   [(Priority)] YYYY-MM-DD <Title> +<project-id> @<todo|doing> id:I-NNNNNN [spec:<wiki-path>] [adr:D-NNNN]
+  Completed: x <completion-date> <creation-date> [(Priority)] <Title> +<project-id> @done id:I-NNNNNN [commit:<sha>]
+
+- [(Priority)]: optional urgency mark, (A) highest; omit for no explicit priority.
+- YYYY-MM-DD: creation date (UTC). The @done form starts with the literal `x`,
+  then the completion date, then the creation date.
+- <Title>: one line, plain text, no trailing period.
+- +<project-id>: the affected registered project (as listed in .gitmodules).
+- @todo | @doing | @done: exactly one state; @done requires the completed form.
+- id:I-NNNNNN: six-digit zero-padded sequential ID matching the file name
+  I-NNNNNN.md. IDs are never reused, renamed or renumbered.
+- spec:<wiki-path>: optional link to the governing .za/wiki/ page.
+- adr:D-NNNN: optional link to a governing decision record.
+- commit:<sha>: optional on @done lines; the commit where the work landed.
+
+BODY — lightweight XP sections:
+
+- `## Problem & Goal`: the problem, context and intended outcome.
+- `## Acceptance Criteria`: stable IDs (AC-01, AC-02, ...); write "None yet"
+  while the issue is a proposal awaiting its accepted specification.
+- `## Implementation & Verification Notes`: provenance, decisions taken,
+  evidence, verification results and hand-off notes.
+
+Add further sections (for example `## Proposals & Open Questions`) only when
+they carry content; never keep empty boilerplate. Keep facts, hypotheses and
+accepted decisions distinguishable in the body. -->

@@ -300,6 +300,7 @@ func TestAddRealGitSuccess(t *testing.T) {
 				".agents/context/pub/adr.md",
 				".agents/context/pub/decisions/.gitkeep",
 				".agents/context/pub/sot.md",
+				".agents/context/pub/status.log",
 				".agents/context/pub/status.md",
 				".agents/context/pub/tools.md",
 				".gitmodules", "AGENTS.md", "go.work", "pub",
@@ -358,6 +359,15 @@ func TestAddRealGitSuccess(t *testing.T) {
 			status := readFile(t, filepath.Join(ctxDir, "status.md"))
 			if !strings.Contains(status, "- Pinned gitlink: `"+pubHead+"`") {
 				t.Errorf("status.md lacks the pinned gitlink:\n%s", status)
+			}
+			// The execution log opens with the deterministic registration
+			// entry from the injected clock.
+			log := readFile(t, filepath.Join(ctxDir, "status.log"))
+			if !strings.Contains(log, "[2026-10-01T12:00:00Z] [za] INITIALIZE: registered this project; pinned gitlink recorded in status.md (verification pending)") {
+				t.Errorf("status.log lacks the registration entry:\n%s", log)
+			}
+			if strings.Contains(log, "<iso-8601-utc>") {
+				t.Errorf("status.log still holds the timestamp placeholder:\n%s", log)
 			}
 			if !strings.Contains(status, "- Verification summary: pending (no scope verified; registration observed the pin)") {
 				t.Errorf("status.md does not mark verification pending for every scope:\n%s", status)
@@ -741,11 +751,12 @@ func TestRenderContextPreservesUserContent(t *testing.T) {
 			"| Observable behavior (proposed) | <discover: proposed behavior authority> | <discover: proposed behavior location> | <discover: revision or date> |\n" +
 			"| Go dependencies | `<project-id>` repository | `<project-id>/go.mod` | <discover: `<project-id>/go.sum` or not applicable> |\n" +
 			"| Go integration overlay | private meta-repository | <discover: `/go.work` or not applicable> | <discover: revision or date> |\n"),
-		"status.md": []byte("# Project Status: <project-id>\n\n- Phase: <decide: bootstrap | active-development | maintenance>\n- Pin observed: YYYY-MM-DD\n- Pinned gitlink: `<full-submodule-SHA>`\n- Verification summary: <decide: derived from the verification record; pending while no scope is verified>\n\n## Known issues\n\n- none\n\n## Next steps\n\n- <decide: at most three concrete items>\n"),
-		"tools.md":  []byte("# Tools: <project-id>\n\n| OpenSpec | <discover: yes/no> | <discover: CLI / agent skill / not adopted> |\n| Go | <discover: yes/no> | <discover: version source and invocation> |\n"),
+		"status.md":  []byte("# Project Status: <project-id>\n\n- Phase: <decide: bootstrap | active-development | maintenance>\n- Pin observed: YYYY-MM-DD\n- Pinned gitlink: `<full-submodule-SHA>`\n- Verification summary: <decide: derived from the verification record; pending while no scope is verified>\n\n## Known issues\n\n- none\n\n## Next steps\n\n- <decide: at most three concrete items>\n"),
+		"status.log": []byte("# Execution Log: <project-id>\n\nMaintainer note: never rewrite history.\n\n[<iso-8601-utc>] [za] INITIALIZE: registered this project\n"),
+		"tools.md":   []byte("# Tools: <project-id>\n\n| OpenSpec | <discover: yes/no> | <discover: CLI / agent skill / not adopted> |\n| Go | <discover: yes/no> | <discover: version source and invocation> |\n"),
 	}
 	for _, openspec := range []bool{false, true} {
-		f := facts{ID: "extractor", Gitlink: gitlink, Date: "2026-11-03", OpenSpec: openspec, GoSum: true}
+		f := facts{ID: "extractor", Gitlink: gitlink, Date: "2026-11-03", Timestamp: "2026-11-03T09:30:00Z", OpenSpec: openspec, GoSum: true}
 		out, err := renderContext(custom, f)
 		if err != nil {
 			t.Fatalf("renderContext(openspec=%t): %v", openspec, err)
@@ -753,6 +764,9 @@ func TestRenderContextPreservesUserContent(t *testing.T) {
 		// User-authored text survives verbatim.
 		if got := string(out["AGENTS.md"]); !strings.Contains(got, "Team note: always ask before rewriting history.\n") {
 			t.Errorf("user content lost from AGENTS.md:\n%s", got)
+		}
+		if got := string(out["status.log"]); !strings.Contains(got, "Maintainer note: never rewrite history.\n") {
+			t.Errorf("user content lost from status.log:\n%s", got)
 		}
 		// Known facts are substituted everywhere, including customized text.
 		for name, got := range out {
@@ -763,6 +777,9 @@ func TestRenderContextPreservesUserContent(t *testing.T) {
 		// Structure substitutions still happen.
 		if got := string(out["status.md"]); !strings.Contains(got, "- Pinned gitlink: `"+gitlink+"`") || !strings.Contains(got, "- Pin observed: 2026-11-03") {
 			t.Errorf("status.md lacks the pin facts:\n%s", got)
+		}
+		if got := string(out["status.log"]); !strings.Contains(got, "[2026-11-03T09:30:00Z] [za] INITIALIZE: registered this project\n") {
+			t.Errorf("status.log lacks the registration entry:\n%s", got)
 		}
 		if got := string(out["tools.md"]); !strings.Contains(got, "| Go | yes | version source `extractor/go.mod`") {
 			t.Errorf("tools.md lacks the Go fact:\n%s", got)

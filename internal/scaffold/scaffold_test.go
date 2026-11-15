@@ -116,15 +116,18 @@ func TestRenderIsDeterministic(t *testing.T) {
 // Hard size ceilings from the architecture's context budget: the root guide
 // 4 KiB, the common guide 3 KiB, the project guide template 3 KiB.
 var ceilings = map[string]int{
-	"AGENTS.md":                                     4 << 10,
-	".agents/context/AGENTS.md":                     3 << 10,
-	".agents/context/templates/issue.md":            12 << 10,
+	"AGENTS.md":                 4 << 10,
+	".agents/context/AGENTS.md": 3 << 10,
 	".agents/context/templates/project/AGENTS.md":   3 << 10,
 	".agents/context/templates/project/tools.md":    6 << 10,
 	".agents/context/templates/project/sot.md":      6 << 10,
 	".agents/context/templates/project/status.md":   2 << 10,
+	".agents/context/templates/project/status.log":  2 << 10,
 	".agents/context/templates/project/adr.md":      3 << 10,
 	".agents/context/templates/project/decision.md": 6 << 10,
+	".za/templates/issue.md":                        12 << 10,
+	".za/templates/wiki.md":                         4 << 10,
+	".za/wiki/index.md":                             2 << 10,
 }
 
 func TestContextSizeBudgets(t *testing.T) {
@@ -222,11 +225,15 @@ func TestScaffoldInstructionContracts(t *testing.T) {
 			"belong in the meta-repository",
 			// COMMON/GLOBAL boundary.
 			"Private context owned by this workspace",
+			"lives only under `.agents/context/` and `.za/`",
 			"neither requires, provisions, modifies nor recursively inspects",
 			"empty personal profile",
 			"surfaced for resolution",
 			// Rule-strength vocabulary.
 			"COMMON MUST > accepted project decision > COMMON DEFAULT",
+			// The .za/ layer in the observable-behavior authority chain.
+			"an assigned `.za/issues/` issue",
+			"an accepted `.za/wiki/` page",
 		},
 		".agents/context/AGENTS.md": {
 			// Explicit multi-project access with implicit access prohibited.
@@ -234,6 +241,18 @@ func TestScaffoldInstructionContracts(t *testing.T) {
 			"never read the context of a project the task does not name",
 			"empty personal profile",
 			"supported loading mechanisms",
+			// The .za/ issue and wiki routing.
+			"`.za/issues/`",
+			"`.za/wiki/index.md`",
+		},
+		".za/templates/issue.md": {
+			// The canonical todo.txt grammar survives template edits.
+			"id:I-NNNNNN",
+			"@done",
+		},
+		".za/wiki/index.md": {
+			"Workspace Wiki Index",
+			".za/templates/wiki.md",
 		},
 		".agents/context/templates/project/AGENTS.md": {
 			// Path semantics: workspace-relative vs document-relative.
@@ -401,11 +420,16 @@ func TestContextRootRouter(t *testing.T) {
 		}
 		for _, want := range []string{
 			".agents/context/AGENTS.md",
-			".agents/context/templates/issue.md",
 			".agents/context/templates/project/AGENTS.md",
 			".agents/context/templates/project/adr.md",
 			".agents/context/templates/project/decision.md",
 			".agents/context/templates/project/sot.md",
+			".agents/context/templates/project/status.log",
+			".za/issues/.gitkeep",
+			".za/templates/issue.md",
+			".za/templates/wiki.md",
+			".za/wiki/index.md",
+			".za/wiki/img/.gitkeep",
 		} {
 			if !slices.Contains(paths, want) {
 				t.Errorf("%s: %s not rendered", m.name, want)
@@ -479,7 +503,7 @@ func TestTopLevel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{".agents", ".editorconfig", ".gitattributes", ".gitignore", ".worktrees", "AGENTS.md", "CLAUDE.md", "za.toml"}
+	want := []string{".agents", ".editorconfig", ".gitattributes", ".gitignore", ".worktrees", ".za", "AGENTS.md", "CLAUDE.md", "za.toml"}
 	if got := s.TopLevel(); !slices.Equal(got, want) {
 		t.Errorf("TopLevel() = %v, want %v", got, want)
 	}

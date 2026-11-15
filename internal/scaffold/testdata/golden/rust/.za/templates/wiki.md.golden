@@ -1,0 +1,29 @@
+# <Page Title>
+
+Summary: <one line: what this page specifies and for which project or scope.>
+
+Status: <draft | accepted> (accepted <YYYY-MM-DD> by <approver>)
+Provenance: <origin of the content: created fresh, or absorbed from <source> at <revision> on <date>>
+
+## Scope
+
+<What this page governs, and what it deliberately does not.>
+
+## Specification
+
+<Normative requirements or reference knowledge. One requirement per subsection with a stable ID (R-01, R-02, ...) when normative; plain sections otherwise.>
+
+## Links
+
+- Issues: `.za/issues/I-NNNNNN.md` (or none yet)
+- Decisions: `.agents/context/<project-id>/decisions/D-NNNN-*.md` (or none)
+- Assets: `.za/wiki/img/<file>` (or none)
+
+<!-- .za wiki template: copy to .za/wiki/<topic>.md with an organically chosen,
+lowercase-hyphenated name (project pages: <project-id>-<topic>.md) and fill it
+in; the copy, not this template, is the record. Every <...> placeholder must be
+replaced before the page is valid; a placeholder left in place is invalid data,
+never a default. Wiki pages are the workspace's private source of truth for
+observable behavior and architecture; where a project's sot.md names a page
+here as the authority for a scope, that page governs. Add sections only when
+they carry content; register new pages in .za/wiki/index.md. -->

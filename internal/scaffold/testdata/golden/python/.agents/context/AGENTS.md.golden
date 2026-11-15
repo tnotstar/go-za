@@ -11,7 +11,7 @@ Read [policy.md](policy.md) first. Its MUST rules bind every project and every a
 | Need | Read |
 |---|---|
 | Integration behavior of the enabled language workspaces | [tooling.md](tooling.md) |
-| Template for workspace and project issues | [templates/issue.md](templates/issue.md) |
+| Workspace issues, wiki and templates (XP workflow) | `.za/issues/`, `.za/wiki/` (index: `.za/wiki/index.md`), `.za/templates/issue.md`, `.za/templates/wiki.md` |
 | Scaffold source for new project contexts | [templates/project/](templates/project/) |
 
 ## Projects
@@ -20,7 +20,11 @@ Project context lives at `.agents/context/<project-id>/AGENTS.md`. Registered pr
 
 ## Issues
 
-Workspace and cross-project issues live under `issues/` when present, one Markdown file per issue following `templates/issue.md`. Issues are reached by ID or reference; never load the collection wholesale.
+Workspace and cross-project issues live under `.za/issues/` (workspace root) as flat sequential Markdown files `I-000000.md`–`I-999999.md`; line 1 of each file is a canonical todo.txt line carrying the state (`@todo`, `@doing`, `@done`), project tag, ID and optional links, with lightweight XP sections in the body (grammar: `.za/templates/issue.md`). Issues are reached by ID or reference; never load the collection wholesale. The `progress.md` checklist pattern is retired in favor of these states; `status.log` change journals remain first-class in each project context.
+
+## Wiki
+
+`.za/wiki/` holds the workspace's private specification and domain-knowledge pages (flat, organically named; navigation starts at `.za/wiki/index.md`). Where a project's `sot.md` names a wiki page as the authority for a scope, that page governs (policy P-20); superseded sources stay recorded in the `sot.md` Evidence column and remain historical evidence only.
 
 ## GLOBAL
 

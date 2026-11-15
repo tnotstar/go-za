@@ -1,0 +1,24 @@
+# Workspace Wiki Index
+
+Summary: Navigation root for `.za/wiki/`, the workspace's private source of truth for observable behavior, architecture and domain knowledge.
+
+## How this wiki works
+
+- One topic per page, flat layout at `.za/wiki/`; project pages are named `<project-id>-<topic>.md`, workspace pages are named freely. Optional images live under `img/`.
+- Page shape: [`.za/templates/wiki.md`](../templates/wiki.md). Where a project's `sot.md` names a page here as the authority for a scope, that page governs (COMMON `policy.md` P-20); superseded sources stay recorded in that `sot.md`'s Evidence column.
+- Requirements on normative pages carry stable IDs (`R-01`, `R-02`, ...) so issues and decisions can reference them precisely.
+
+## Pages
+
+### Workspace
+
+None yet.
+
+### Projects
+
+None yet.
+
+## Related
+
+- Issues: `.za/issues/` (proposal and specification records; grammar in `.za/templates/issue.md`)
+- Authorities: `.agents/context/<project-id>/sot.md`

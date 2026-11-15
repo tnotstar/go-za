@@ -52,17 +52,22 @@ var commonPaths = []string{
 	".agents/context/AGENTS.md",
 	".agents/context/policy.md",
 	".agents/context/tooling.md",
-	".agents/context/templates/issue.md",
 	".agents/context/templates/project/AGENTS.md",
 	".agents/context/templates/project/adr.md",
 	".agents/context/templates/project/decision.md",
 	".agents/context/templates/project/sot.md",
+	".agents/context/templates/project/status.log",
 	".agents/context/templates/project/status.md",
 	".agents/context/templates/project/tools.md",
 	".agents/hooks/meta",
 	".agents/hooks/public",
 	".agents/runtime",
 	".worktrees",
+	".za/issues/.gitkeep",
+	".za/templates/issue.md",
+	".za/templates/wiki.md",
+	".za/wiki/img/.gitkeep",
+	".za/wiki/index.md",
 }
 
 func TestRunModes(t *testing.T) {

@@ -6,14 +6,15 @@ Summary: Shared tool conventions and the integration behavior of the enabled lan
 
 - `za` is the canonical command for managing this workspace's architecture.
 - It replaces hand-written management scripts: never add shell, Python or Make scripts under `.agents/` that duplicate workspace-management behavior.
-- Available: `za init`, already applied to this workspace, `za project add <repo-url>`, which registers a root-module Go project as a submodule and creates its private context, `za issue` and `za board`, which manage the issue records in `.za/issues/`, and `za version`, which reports the executable's build provenance.
-- Until a `za` subcommand covers a task (wiki management, project removal or synchronization, checking drift, creating or removing worktrees), perform it with the native tools below, following `policy.md`.
+- Available: `za init`, already applied to this workspace, `za project add <repo-url>`, which registers a root-module Go project as a submodule and creates its private context, `za issue` and `za board`, which manage the issue records in `.za/issues/`, `za wiki`, which manages the wiki pages in `.za/wiki/`, and `za version`, which reports the executable's build provenance.
+- Until a `za` subcommand covers a task (project removal or synchronization, checking drift, creating or removing worktrees), perform it with the native tools below, following `policy.md`.
 
 ## Workspace `.za/` artifacts
 
 - `.za/issues/`, `.za/wiki/` and `.za/templates/` are workspace-owned private artifacts at the workspace root, recognized by `policy.md` (P-01, P-20) alongside `.agents/context/`.
-- Issues are managed with `za issue` (`add`, `new`, `ls`, `show`, `move`) and `za board`; the canonical todo.txt grammar of their first line is documented in `.za/templates/issue.md`.
-- Wiki pages follow `.za/templates/wiki.md`, with navigation starting at `.za/wiki/index.md`; until `za` gains wiki commands, create and edit them by hand; never add scripts under `.agents/` that duplicate that planned behavior.
+- Issues are managed with `za issue` (`add`, `new`, `ls`, `show`, `move`, `prompt`) and `za board`; the canonical todo.txt grammar of their first line is documented in `.za/templates/issue.md`.
+- Wiki pages are managed with `za wiki` (`new`, `ls`, `show`) and follow `.za/templates/wiki.md`, with navigation starting at `.za/wiki/index.md`.
+- Agents assemble their per-task context with `za issue prompt <ID>`; never add scripts under `.agents/` that duplicate these commands.
 
 ## Native tools
 

@@ -14,6 +14,7 @@ import (
 	"github.com/tnotstar/go-za/internal/project"
 	"github.com/tnotstar/go-za/internal/tool"
 	"github.com/tnotstar/go-za/internal/version"
+	"github.com/tnotstar/go-za/internal/wiki"
 )
 
 // Exit codes returned by Run.
@@ -33,6 +34,7 @@ Commands:
   project  Manage the projects of a za workspace
   issue    Manage the workspace issues (.za/issues/)
   board    Show the Kanban board of the workspace issues
+  wiki     Manage the workspace wiki pages (.za/wiki/)
   version  Print the version of the za executable
 
 Run "za <command> --help" for details about a command.
@@ -79,6 +81,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, env Env) 
 		return runIssue(ctx, args[1:], stdout, stderr, issue.Env{Getwd: env.Getwd, Now: env.Now})
 	case "board":
 		return runBoard(ctx, args[1:], stdout, stderr, issue.Env{Getwd: env.Getwd, Now: env.Now})
+	case "wiki":
+		return runWiki(args[1:], stdout, stderr, env.Getwd)
 	case "version":
 		return runVersion(args[1:], stdout, stderr)
 	default:
@@ -166,10 +170,125 @@ func runIssue(_ context.Context, args []string, stdout, stderr io.Writer, env is
 		return runIssueShow(args[1:], stdout, stderr, env)
 	case "move":
 		return runIssueMove(args[1:], stdout, stderr, env)
+	case "prompt":
+		return runIssuePrompt(args[1:], stdout, stderr, env)
 	default:
 		fmt.Fprintf(stderr, "error: unknown issue command %q\nRun \"za issue --help\" for usage.\n", args[0])
 		return ExitUsage
 	}
+}
+
+// runIssuePrompt implements "za issue prompt": the self-contained XP
+// context prompt for one issue.
+func runIssuePrompt(args []string, stdout, stderr io.Writer, env issue.Env) int {
+	opts, err := issue.ParsePromptArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, issue.PromptUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "issue")
+	}
+	root, err := env.Root()
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	prompt, err := issue.Prompt(root, opts.ID)
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	fmt.Fprint(stdout, prompt)
+	return ExitOK
+}
+
+// runWiki dispatches the "za wiki" subcommands. The commands perform pure
+// file operations on the workspace's .za/wiki/ pages, so they need no
+// native command runner and no context.
+func runWiki(args []string, stdout, stderr io.Writer, getwd func() (string, error)) int {
+	if len(args) == 0 {
+		fmt.Fprint(stderr, wiki.Usage)
+		return ExitUsage
+	}
+	switch args[0] {
+	case "-h", "-help", "--help", "help":
+		fmt.Fprint(stdout, wiki.Usage)
+		return ExitOK
+	case "new":
+		return runWikiNew(args[1:], stdout, stderr, getwd)
+	case "ls":
+		return runWikiLs(args[1:], stdout, stderr, getwd)
+	case "show":
+		return runWikiShow(args[1:], stdout, stderr, getwd)
+	default:
+		fmt.Fprintf(stderr, "error: unknown wiki command %q\nRun \"za wiki --help\" for usage.\n", args[0])
+		return ExitUsage
+	}
+}
+
+// runWikiNew implements "za wiki new".
+func runWikiNew(args []string, stdout, stderr io.Writer, getwd func() (string, error)) int {
+	opts, err := wiki.ParseNewArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, wiki.NewUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "wiki")
+	}
+	root, err := wiki.Root(mustWd(getwd))
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	p, err := wiki.New(root, opts.Slug, opts.Title)
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	fmt.Fprintln(stdout, p)
+	return ExitOK
+}
+
+// runWikiLs implements "za wiki ls".
+func runWikiLs(args []string, stdout, stderr io.Writer, getwd func() (string, error)) int {
+	if len(args) > 0 {
+		fmt.Fprint(stderr, wiki.LsUsage)
+		return ExitUsage
+	}
+	root, err := wiki.Root(mustWd(getwd))
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	pages, err := wiki.Ls(root)
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	for _, page := range pages {
+		fmt.Fprintf(stdout, "%s\t%s\t%s\n", page.Slug, wiki.Path(page.Slug), page.Title)
+	}
+	return ExitOK
+}
+
+// runWikiShow implements "za wiki show".
+func runWikiShow(args []string, stdout, stderr io.Writer, getwd func() (string, error)) int {
+	slug, err := wiki.ParseShowArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Fprint(stdout, wiki.ShowUsage)
+		return ExitOK
+	}
+	if err != nil {
+		return usageExit(stderr, err, "wiki")
+	}
+	root, err := wiki.Root(mustWd(getwd))
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	data, err := wiki.Read(root, slug)
+	if err != nil {
+		return failureExit(stderr, err)
+	}
+	if _, werr := stdout.Write(data); werr != nil {
+		return failureExit(stderr, werr)
+	}
+	return ExitOK
 }
 
 // runIssueAdd implements "za issue add": the fast path with the built-in
@@ -312,6 +431,16 @@ func runBoard(_ context.Context, args []string, stdout, stderr io.Writer, env is
 	}
 	fmt.Fprint(stdout, issue.Board(issue.Filter(issues, "all", opts.Project, 0)))
 	return ExitOK
+}
+
+// mustWd resolves the working directory, returning "" on error so the
+// downstream discovery reports the actionable diagnostic.
+func mustWd(getwd func() (string, error)) string {
+	wd, err := getwd()
+	if err != nil {
+		return ""
+	}
+	return wd
 }
 
 func usageExit(stderr io.Writer, err error, command string) int {

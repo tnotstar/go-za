@@ -17,8 +17,9 @@ projects may be public, client-private or otherwise restricted.
 |---|---|
 | `za init` | Initializes an empty directory as a meta-workspace |
 | `za project add` | Adds one root-module Go repository as a project (first minimal version) |
-| `za issue` | Manages the workspace issue records in `.za/issues/` |
+| `za issue` | Manages the workspace issue records in `.za/issues/` and assembles agent prompts |
 | `za board` | Renders the Kanban view of the workspace issues |
+| `za wiki` | Manages the workspace wiki pages in `.za/wiki/` |
 | `za version` | Prints the version of the executable and its build provenance |
 
 `za` creates no worktrees, installs no hooks and never calls GitHub or any
@@ -290,6 +291,7 @@ za issue new [flags] "<title>" | "<raw todo.txt line>"
 za issue ls [flags]
 za issue show <ID>
 za issue move <ID> <todo|doing|done> [-commit <sha>]
+za issue prompt <ID>
 ```
 
 Issues live as flat records in `.za/issues/`: one Markdown file
@@ -330,6 +332,15 @@ and rewrite only that line, and the Markdown body is never rewrapped. Line
   date to today (UTC) and records `-commit` when given; reopening strips
   the completion prefix and the landing commit. The rewritten line is
   serialized canonically, so its tag order may change.
+- `prompt` prints a deterministic, self-contained Markdown prompt for an
+  AI coding agent: the task header from the record line, the required
+  context routing (workspace guides, the named projects' private context,
+  the `spec:` wiki pages and the `adr:` decision records), the execution
+  boundary per policy P-15 (task worktree `.worktrees/<project>/<ID>/`,
+  `GOWORK=off` for root-module Go projects), and the verbatim issue body.
+  A `spec:` value resolves to `.za/wiki/<value>.md` (or is used as-is when
+  it already names a `.za/wiki/` path) and must exist: routing an agent to
+  a missing page fails the command.
 
 All dates are UTC. Every malformed record — a first line that violates the
 grammar, an `id:` tag that does not match the file name, a non-blank line
@@ -350,6 +361,38 @@ Renders the plain-text Kanban view of `.za/issues/`: three sections
 (`DOING`, `TODO`, `DONE`), each row showing ID, priority, `+projects` and
 title, sorted by priority and ID. The output carries no ANSI escapes and is
 deterministic byte for byte.
+
+## `za wiki`
+
+```text
+za wiki new [-title "<Title>"] <slug>
+za wiki ls
+za wiki show <slug>
+```
+
+Wiki pages are the workspace's private specification and knowledge base in
+`.za/wiki/`: flat, organically named Markdown files (navigation:
+`.za/wiki/index.md`).
+
+- `new` creates `.za/wiki/<slug>.md` exclusively (an existing page or
+  directory is never overwritten) and prints the created path. The body
+  comes from the workspace's own `.za/templates/wiki.md` when present (its
+  `# ` heading is replaced with the title), falling back to a clean draft
+  skeleton; with `-title` omitted, the title is derived from the slug
+  (`go-minolas-architecture` becomes `Go Minolas Architecture`).
+- `ls` prints deterministic tab-separated lines
+  `<slug>  <path>  <title>` sorted lexicographically by slug. Only regular
+  `.md` files directly in `.za/wiki/` are listed (subdirectories such as
+  `img/` are skipped); titles are each page's first `# ` heading, read
+  through a bounded stream, with the slug as fallback.
+- `show` prints the full page; the slug accepts the name with or without
+  the `.md` suffix.
+
+Slugs are validated fail-closed: empty, dot-prefixed, separator-bearing or
+traversal names, control characters and the reserved `img/` asset
+directory are rejected, and content with CR line endings is an error. Exit
+status follows the other commands: `0` success, `1` operational failure,
+`2` invalid usage.
 
 ## `za version`
 

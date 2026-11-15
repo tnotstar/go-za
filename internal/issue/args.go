@@ -23,6 +23,7 @@ Commands:
   ls      List issues sorted by priority, status and ID
   show    Print the full content of one issue record
   move    Move an issue to another state (todo, doing, done)
+  prompt  Assemble the self-contained XP context prompt for one issue
 
 Run "za issue <command> --help" for details about a command.
 `
@@ -249,6 +250,46 @@ func ParseLsArgs(args []string) (LsArgs, error) {
 		return req, &UsageError{"unexpected arguments after the flags"}
 	}
 	return req, nil
+}
+
+// PromptUsage is the help text for "za issue prompt".
+const PromptUsage = `Usage:
+  za issue prompt <ID>
+
+Assemble the self-contained XP context prompt for one issue: the task
+header from its todo.txt line, the required context routing (workspace
+guides, the named projects' private context, the spec: wiki pages and the
+adr: decision records), the execution boundary per policy P-15, and the
+verbatim issue specification body.
+
+The spec: tag value is resolved to .za/wiki/<value>.md (or used as-is when
+it already names a .za/wiki/ path) and must exist, so an agent is never
+routed to a missing page. The output is deterministic Markdown with
+workspace-relative paths.
+
+The ID accepts I-NNNNNN or a numeric shorthand (4, 000004).
+`
+
+// ParsePromptArgs parses "za issue prompt" arguments; the flag set is the
+// same shape as show's.
+func ParsePromptArgs(args []string) (ShowArgs, error) {
+	fs := flag.NewFlagSet("issue prompt", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ShowArgs{}, err
+		}
+		return ShowArgs{}, &UsageError{err.Error()}
+	}
+	rest := fs.Args()
+	if len(rest) != 1 {
+		return ShowArgs{}, &UsageError{"expected exactly one issue ID"}
+	}
+	id, err := NormalizeID(rest[0])
+	if err != nil {
+		return ShowArgs{}, &UsageError{err.Error()}
+	}
+	return ShowArgs{ID: id}, nil
 }
 
 // ShowArgs is the parsed "za issue show" invocation.

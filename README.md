@@ -659,11 +659,12 @@ skips the real-tool tests.
 
 The default is **zero external Go dependencies**. Nominal exceptions require
 an accepted decision record in the workspace context and are limited to
-implementations of formal specifications the Go standard library does not
-cover, with zero transitive dependencies in `go.sum`. The current allowlist:
-`github.com/BurntSushi/toml` (TOML v1.0.0) for parsing `Cargo.toml`
-manifests; the workspace's own `za.toml` keeps its strict hand-rolled subset
-parser, which encodes schema 4's fail-closed acceptance contract.
+implementations with zero transitive dependencies in `go.sum`. The current
+allowlist: `github.com/BurntSushi/toml` (TOML v1.0.0) for parsing `Cargo.toml`
+manifests, and `github.com/tnotstar/go-minolas` (`pkg/cli/argparse`, pure
+standard library) for CLI argument parsing; the workspace's own `za.toml`
+keeps its strict hand-rolled subset parser, which encodes schema 4's
+fail-closed acceptance contract.
 
 The repository forces LF line endings through `.gitattributes`. Templates are
 embedded byte-for-byte and golden tests compare exact bytes, so do not

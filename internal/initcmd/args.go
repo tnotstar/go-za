@@ -3,8 +3,9 @@ package initcmd
 
 import (
 	"errors"
-	"flag"
-	"io"
+	"strings"
+
+	"github.com/tnotstar/go-minolas/pkg/cli/argparse"
 )
 
 // Usage is the help text for "za init".
@@ -43,46 +44,38 @@ type UsageError struct {
 func (e *UsageError) Error() string { return e.msg }
 
 // ParseArgs parses "za init" arguments. Flags may appear before or after the
-// path; everything after "--" is positional. It returns flag.ErrHelp when
+// path; everything after "--" is positional. It returns argparse.ErrHelp when
 // help was requested and a *UsageError for invalid usage.
 func ParseArgs(args []string) (Options, error) {
-	var opts Options
-	fs := flag.NewFlagSet("init", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	fs.BoolVar(&opts.Go, "go", false, "")
-	fs.BoolVar(&opts.Python, "python", false, "")
-	fs.BoolVar(&opts.Rust, "rust", false, "")
+	p := argparse.NewArgumentParser("init", "")
+	goFlag := p.Bool("--go")
+	pythonFlag := p.Bool("--python")
+	rustFlag := p.Bool("--rust")
+	pathArg := p.String("PATH")
 
-	var positional []string
-	for {
-		if err := fs.Parse(args); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return Options{}, err
-			}
-			return Options{}, &UsageError{err.Error()}
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
+			return Options{}, err
 		}
-		rest := fs.Args()
-		if len(rest) == 0 {
-			break
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return Options{}, &UsageError{"too many arguments: expected at most one PATH"}
 		}
-		if consumed := len(args) - len(rest); consumed > 0 && args[consumed-1] == "--" {
-			positional = append(positional, rest...)
-			break
-		}
-		positional = append(positional, rest[0])
-		args = rest[1:]
+		return Options{}, &UsageError{err.Error()}
 	}
 
+	opts := Options{
+		Go:     *goFlag,
+		Python: *pythonFlag,
+		Rust:   *rustFlag,
+	}
 	switch {
-	case len(positional) > 1:
-		return Options{}, &UsageError{"too many arguments: expected at most one PATH"}
-	case len(positional) == 1 && positional[0] == "":
+	case p.Seen("PATH") && *pathArg == "":
 		return Options{}, &UsageError{"PATH must not be empty"}
 	case !opts.Go && !opts.Python && !opts.Rust:
 		return Options{}, &UsageError{"at least one workspace type is required: --go, --python and/or --rust"}
 	}
-	if len(positional) == 1 {
-		opts.Path = positional[0]
+	if p.Seen("PATH") {
+		opts.Path = *pathArg
 	}
 	return opts, nil
 }

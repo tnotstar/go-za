@@ -1,2 +1,4 @@
 github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
+github.com/tnotstar/go-minolas v0.0.0-20261116192608-fc47a72a6cb2 h1:gQrxBDKWrysWUAoSxkL0G7JE+a+okkjlK9q+kDv8yt0=
+github.com/tnotstar/go-minolas v0.0.0-20261116192608-fc47a72a6cb2/go.mod h1:D5Iy/ENHsWn6P8czkE0mfi+MQ82nwwhBLS+5NuuFeBM=

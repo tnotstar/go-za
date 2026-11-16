@@ -2,8 +2,9 @@ package wiki
 
 import (
 	"errors"
-	"flag"
-	"io"
+	"strings"
+
+	"github.com/tnotstar/go-minolas/pkg/cli/argparse"
 )
 
 // Usage is the help text for "za wiki".
@@ -76,39 +77,41 @@ type NewArgs struct {
 
 // ParseNewArgs parses "za wiki new" arguments.
 func ParseNewArgs(args []string) (NewArgs, error) {
-	fs := flag.NewFlagSet("wiki new", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	title := fs.String("title", "", "page title (default: derived from the slug)")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
+	p := argparse.NewArgumentParser("wiki new", "")
+	title := p.String("-title")
+	slug := p.String("slug")
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
 			return NewArgs{}, err
+		}
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return NewArgs{}, &UsageError{"expected exactly one page slug"}
 		}
 		return NewArgs{}, &UsageError{err.Error()}
 	}
-	rest := fs.Args()
-	if len(rest) != 1 {
+	if !p.Seen("slug") {
 		return NewArgs{}, &UsageError{"expected exactly one page slug"}
 	}
-	var req NewArgs
-	req.Slug, req.Title = rest[0], *title
-	return req, nil
+	return NewArgs{Slug: *slug, Title: *title}, nil
 }
 
 // ParseShowArgs parses "za wiki show" arguments.
 func ParseShowArgs(args []string) (string, error) {
-	fs := flag.NewFlagSet("wiki show", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
+	p := argparse.NewArgumentParser("wiki show", "")
+	rawSlug := p.String("slug")
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
 			return "", err
+		}
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return "", &UsageError{"expected exactly one page slug"}
 		}
 		return "", &UsageError{err.Error()}
 	}
-	rest := fs.Args()
-	if len(rest) != 1 {
+	if !p.Seen("slug") {
 		return "", &UsageError{"expected exactly one page slug"}
 	}
-	slug, err := NormalizeSlug(rest[0])
+	slug, err := NormalizeSlug(*rawSlug)
 	if err != nil {
 		return "", &UsageError{err.Error()}
 	}

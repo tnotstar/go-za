@@ -3,8 +3,9 @@ package project
 
 import (
 	"errors"
-	"flag"
-	"io"
+	"strings"
+
+	"github.com/tnotstar/go-minolas/pkg/cli/argparse"
 )
 
 // Usage is the help text for "za project".
@@ -56,25 +57,26 @@ type UsageError struct {
 func (e *UsageError) Error() string { return e.msg }
 
 // ParseAddArgs parses "za project add" arguments and returns the repository
-// URL. It returns flag.ErrHelp when help was requested and a *UsageError for
+// URL. It returns argparse.ErrHelp when help was requested and a *UsageError for
 // invalid usage.
 func ParseAddArgs(args []string) (string, error) {
-	fs := flag.NewFlagSet("project add", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
+	p := argparse.NewArgumentParser("project add", "")
+	repoURL := p.String("repo-url")
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
 			return "", err
+		}
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return "", &UsageError{"too many arguments: expected exactly one repository URL"}
 		}
 		return "", &UsageError{err.Error()}
 	}
-	switch rest := fs.Args(); {
-	case len(rest) == 0:
+	switch {
+	case !p.Seen("repo-url"):
 		return "", &UsageError{"missing repository URL"}
-	case len(rest) > 1:
-		return "", &UsageError{"too many arguments: expected exactly one repository URL"}
-	case rest[0] == "":
+	case *repoURL == "":
 		return "", &UsageError{"repository URL must not be empty"}
 	default:
-		return rest[0], nil
+		return *repoURL, nil
 	}
 }

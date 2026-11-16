@@ -4,11 +4,11 @@ package cli
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/tnotstar/go-minolas/pkg/cli/argparse"
 	"github.com/tnotstar/go-za/internal/initcmd"
 	"github.com/tnotstar/go-za/internal/issue"
 	"github.com/tnotstar/go-za/internal/project"
@@ -93,7 +93,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, env Env) 
 
 func runInit(ctx context.Context, args []string, stdout, stderr io.Writer, env initcmd.Env) int {
 	opts, err := initcmd.ParseArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, initcmd.Usage)
 		return ExitOK
 	}
@@ -130,7 +130,7 @@ func runProject(ctx context.Context, args []string, stdout, stderr io.Writer, en
 
 func runProjectAdd(ctx context.Context, args []string, stdout, stderr io.Writer, env project.Env) int {
 	url, err := project.ParseAddArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, project.AddUsage)
 		return ExitOK
 	}
@@ -182,7 +182,7 @@ func runIssue(_ context.Context, args []string, stdout, stderr io.Writer, env is
 // context prompt for one issue.
 func runIssuePrompt(args []string, stdout, stderr io.Writer, env issue.Env) int {
 	opts, err := issue.ParsePromptArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, issue.PromptUsage)
 		return ExitOK
 	}
@@ -228,7 +228,7 @@ func runWiki(args []string, stdout, stderr io.Writer, getwd func() (string, erro
 // runWikiNew implements "za wiki new".
 func runWikiNew(args []string, stdout, stderr io.Writer, getwd func() (string, error)) int {
 	opts, err := wiki.ParseNewArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, wiki.NewUsage)
 		return ExitOK
 	}
@@ -270,7 +270,7 @@ func runWikiLs(args []string, stdout, stderr io.Writer, getwd func() (string, er
 // runWikiShow implements "za wiki show".
 func runWikiShow(args []string, stdout, stderr io.Writer, getwd func() (string, error)) int {
 	slug, err := wiki.ParseShowArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, wiki.ShowUsage)
 		return ExitOK
 	}
@@ -295,7 +295,7 @@ func runWikiShow(args []string, stdout, stderr io.Writer, getwd func() (string, 
 // skeleton body.
 func runIssueAdd(args []string, stdout, stderr io.Writer, env issue.Env, body, usage string) int {
 	req, err := issue.ParseAddArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, usage)
 		return ExitOK
 	}
@@ -317,7 +317,7 @@ func runIssueAdd(args []string, stdout, stderr io.Writer, env issue.Env, body, u
 // runIssueNew implements "za issue new": the template-backed initializer.
 func runIssueNew(args []string, stdout, stderr io.Writer, env issue.Env) int {
 	req, err := issue.ParseNewArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, issue.AddUsage)
 		return ExitOK
 	}
@@ -343,7 +343,7 @@ func runIssueNew(args []string, stdout, stderr io.Writer, env issue.Env) int {
 // runIssueLs implements "za issue ls".
 func runIssueLs(args []string, stdout, stderr io.Writer, env issue.Env) int {
 	opts, err := issue.ParseLsArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, issue.LsUsage)
 		return ExitOK
 	}
@@ -367,7 +367,7 @@ func runIssueLs(args []string, stdout, stderr io.Writer, env issue.Env) int {
 // runIssueShow implements "za issue show".
 func runIssueShow(args []string, stdout, stderr io.Writer, env issue.Env) int {
 	opts, err := issue.ParseShowArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, issue.ShowUsage)
 		return ExitOK
 	}
@@ -392,7 +392,7 @@ func runIssueShow(args []string, stdout, stderr io.Writer, env issue.Env) int {
 // line.
 func runIssueMove(args []string, stdout, stderr io.Writer, env issue.Env) int {
 	opts, err := issue.ParseMoveArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, issue.MoveUsage)
 		return ExitOK
 	}
@@ -414,7 +414,7 @@ func runIssueMove(args []string, stdout, stderr io.Writer, env issue.Env) int {
 // runBoard implements "za board".
 func runBoard(_ context.Context, args []string, stdout, stderr io.Writer, env issue.Env) int {
 	opts, err := issue.ParseBoardArgs(args)
-	if errors.Is(err, flag.ErrHelp) {
+	if errors.Is(err, argparse.ErrHelp) {
 		fmt.Fprint(stdout, issue.BoardUsage)
 		return ExitOK
 	}

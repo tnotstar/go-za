@@ -2,8 +2,9 @@ package initcmd
 
 import (
 	"errors"
-	"flag"
 	"testing"
+
+	"github.com/tnotstar/go-minolas/pkg/cli/argparse"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -58,8 +59,8 @@ func TestParseArgs(t *testing.T) {
 
 func TestParseArgsHelp(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"-h"}, {"--go", "--help"}} {
-		if _, err := ParseArgs(args); !errors.Is(err, flag.ErrHelp) {
-			t.Errorf("ParseArgs(%q) error = %v, want flag.ErrHelp", args, err)
+		if _, err := ParseArgs(args); !errors.Is(err, argparse.ErrHelp) {
+			t.Errorf("ParseArgs(%q) error = %v, want argparse.ErrHelp", args, err)
 		}
 	}
 }

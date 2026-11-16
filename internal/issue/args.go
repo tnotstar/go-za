@@ -2,11 +2,11 @@ package issue
 
 import (
 	"errors"
-	"flag"
 	"fmt"
-	"io"
 	"regexp"
 	"strings"
+
+	"github.com/tnotstar/go-minolas/pkg/cli/argparse"
 )
 
 // Usage is the help text for "za issue".
@@ -114,20 +114,19 @@ func (e *UsageError) Error() string { return e.msg }
 
 var adrPattern = regexp.MustCompile(`^D-\d{4}$`)
 
-// projectList accumulates repeated or comma-separated -project values.
-type projectList []string
-
-func (p *projectList) String() string { return strings.Join(*p, ",") }
-
-func (p *projectList) Set(v string) error {
-	for _, name := range strings.Split(v, ",") {
-		name = strings.TrimSpace(name)
-		if !validProjectName(name) {
-			return fmt.Errorf("malformed project name %q", name)
+// parseProjects splits comma-separated project tokens and validates each name.
+func parseProjects(raw []string) ([]string, error) {
+	var out []string
+	for _, entry := range raw {
+		for _, name := range strings.Split(entry, ",") {
+			name = strings.TrimSpace(name)
+			if !validProjectName(name) {
+				return nil, fmt.Errorf("malformed project name %q", name)
+			}
+			out = append(out, name)
 		}
-		*p = append(*p, name)
 	}
-	return nil
+	return out, nil
 }
 
 // AddArgs is the parsed "za issue add"/"za issue new" invocation.
@@ -137,52 +136,43 @@ type AddArgs struct {
 }
 
 func parseAddArgs(cmd string, args []string) (AddArgs, error) {
-	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	prio := fs.String("p", "B", "priority letter A-Z")
-	var projects projectList
-	fs.Var(&projects, "project", "affected project, repeatable or comma-separated")
-	status := fs.String("status", string(Todo), "initial state: todo or doing")
-	spec := fs.String("spec", "", "governing wiki page path")
-	adr := fs.String("adr", "", "governing decision record ID")
+	p := argparse.NewArgumentParser(cmd, "")
+	prio := p.String("-p", argparse.Default("B"))
+	rawProjects := p.StringList("-project")
+	status := p.String("-status", argparse.Default(string(Todo)))
+	spec := p.String("-spec")
+	adr := p.String("-adr")
+	title := p.String("title")
 
-	// Flags may appear before or after the positional argument; everything
-	// after "--" is positional.
-	var positional []string
-	for {
-		if err := fs.Parse(args); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return AddArgs{}, err
-			}
-			return AddArgs{}, &UsageError{err.Error()}
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
+			return AddArgs{}, err
 		}
-		rest := fs.Args()
-		if len(rest) == 0 {
-			break
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return AddArgs{}, &UsageError{"expected exactly one title or raw todo.txt line"}
 		}
-		if consumed := len(args) - len(rest); consumed > 0 && args[consumed-1] == "--" {
-			positional = append(positional, rest...)
-			break
-		}
-		positional = append(positional, rest[0])
-		args = rest[1:]
+		return AddArgs{}, &UsageError{err.Error()}
 	}
-	if len(positional) != 1 {
+	if !p.Seen("title") {
 		return AddArgs{}, &UsageError{"expected exactly one title or raw todo.txt line"}
 	}
 
 	// A raw todo.txt line is used as-is and cannot be combined with flags.
-	setFlags := map[string]bool{}
-	fs.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
-	if iss, err := ParseAllocating(positional[0]); err == nil {
-		if len(setFlags) > 0 {
+	anyFlagSeen := p.Seen("p") || p.Seen("project") || p.Seen("status") || p.Seen("spec") || p.Seen("adr")
+	if iss, err := ParseAllocating(*title); err == nil {
+		if anyFlagSeen {
 			return AddArgs{}, &UsageError{"a raw todo.txt line cannot be combined with flags"}
 		}
 		return AddArgs{Issue: iss, Raw: true}, nil
 	}
 
+	projects, err := parseProjects(*rawProjects)
+	if err != nil {
+		return AddArgs{}, &UsageError{err.Error()}
+	}
+
 	var req AddArgs
-	req.Issue.Title = positional[0]
+	req.Issue.Title = *title
 	if len(*prio) != 1 || (*prio)[0] < 'A' || (*prio)[0] > 'Z' {
 		return req, &UsageError{fmt.Sprintf("invalid priority %q (want a single letter A-Z)", *prio)}
 	}
@@ -222,14 +212,16 @@ type LsArgs struct {
 
 // ParseLsArgs parses "za issue ls" arguments.
 func ParseLsArgs(args []string) (LsArgs, error) {
-	fs := flag.NewFlagSet("issue ls", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	status := fs.String("status", "active", "filter: active, todo, doing, done or all")
-	project := fs.String("project", "", "only issues naming +<id>")
-	prio := fs.String("priority", "", "only issues with this priority letter")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
+	p := argparse.NewArgumentParser("issue ls", "")
+	status := p.String("-status", argparse.Default("active"))
+	project := p.String("-project")
+	prio := p.String("-priority")
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
 			return LsArgs{}, err
+		}
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return LsArgs{}, &UsageError{"unexpected arguments after the flags"}
 		}
 		return LsArgs{}, &UsageError{err.Error()}
 	}
@@ -245,9 +237,6 @@ func ParseLsArgs(args []string) (LsArgs, error) {
 			return req, &UsageError{fmt.Sprintf("invalid priority %q (want a single letter A-Z)", *prio)}
 		}
 		req.Priority = (*prio)[0]
-	}
-	if rest := fs.Args(); len(rest) > 0 {
-		return req, &UsageError{"unexpected arguments after the flags"}
 	}
 	return req, nil
 }
@@ -270,26 +259,32 @@ workspace-relative paths.
 The ID accepts I-NNNNNN or a numeric shorthand (4, 000004).
 `
 
-// ParsePromptArgs parses "za issue prompt" arguments; the flag set is the
-// same shape as show's.
-func ParsePromptArgs(args []string) (ShowArgs, error) {
-	fs := flag.NewFlagSet("issue prompt", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
+func parseSingleIDArgs(cmd string, args []string) (ShowArgs, error) {
+	p := argparse.NewArgumentParser(cmd, "")
+	rawID := p.String("id")
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
 			return ShowArgs{}, err
+		}
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return ShowArgs{}, &UsageError{"expected exactly one issue ID"}
 		}
 		return ShowArgs{}, &UsageError{err.Error()}
 	}
-	rest := fs.Args()
-	if len(rest) != 1 {
+	if !p.Seen("id") {
 		return ShowArgs{}, &UsageError{"expected exactly one issue ID"}
 	}
-	id, err := NormalizeID(rest[0])
+	id, err := NormalizeID(*rawID)
 	if err != nil {
 		return ShowArgs{}, &UsageError{err.Error()}
 	}
 	return ShowArgs{ID: id}, nil
+}
+
+// ParsePromptArgs parses "za issue prompt" arguments; the flag set is the
+// same shape as show's.
+func ParsePromptArgs(args []string) (ShowArgs, error) {
+	return parseSingleIDArgs("issue prompt", args)
 }
 
 // ShowArgs is the parsed "za issue show" invocation.
@@ -299,23 +294,7 @@ type ShowArgs struct {
 
 // ParseShowArgs parses "za issue show" arguments.
 func ParseShowArgs(args []string) (ShowArgs, error) {
-	fs := flag.NewFlagSet("issue show", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return ShowArgs{}, err
-		}
-		return ShowArgs{}, &UsageError{err.Error()}
-	}
-	rest := fs.Args()
-	if len(rest) != 1 {
-		return ShowArgs{}, &UsageError{"expected exactly one issue ID"}
-	}
-	id, err := NormalizeID(rest[0])
-	if err != nil {
-		return ShowArgs{}, &UsageError{err.Error()}
-	}
-	return ShowArgs{ID: id}, nil
+	return parseSingleIDArgs("issue show", args)
 }
 
 // MoveArgs is the parsed "za issue move" invocation.
@@ -328,43 +307,33 @@ type MoveArgs struct {
 // ParseMoveArgs parses "za issue move" arguments; flags may appear before
 // or after the positional ID and state.
 func ParseMoveArgs(args []string) (MoveArgs, error) {
-	fs := flag.NewFlagSet("issue move", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	commit := fs.String("commit", "", "landing commit SHA recorded when moving to done")
+	p := argparse.NewArgumentParser("issue move", "")
+	commit := p.String("-commit")
+	rawID := p.String("id")
+	rawState := p.String("state")
 
-	var positional []string
-	for {
-		if err := fs.Parse(args); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return MoveArgs{}, err
-			}
-			return MoveArgs{}, &UsageError{err.Error()}
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
+			return MoveArgs{}, err
 		}
-		rest := fs.Args()
-		if len(rest) == 0 {
-			break
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return MoveArgs{}, &UsageError{"expected exactly one issue ID and one target state"}
 		}
-		if consumed := len(args) - len(rest); consumed > 0 && args[consumed-1] == "--" {
-			positional = append(positional, rest...)
-			break
-		}
-		positional = append(positional, rest[0])
-		args = rest[1:]
+		return MoveArgs{}, &UsageError{err.Error()}
 	}
-	if len(positional) != 2 {
+	if !p.Seen("id") || !p.Seen("state") {
 		return MoveArgs{}, &UsageError{"expected exactly one issue ID and one target state"}
 	}
-	id, err := NormalizeID(positional[0])
+	id, err := NormalizeID(*rawID)
 	if err != nil {
 		return MoveArgs{}, &UsageError{err.Error()}
 	}
-	var req MoveArgs
-	req.ID, req.Commit = id, *commit
-	switch to := Status(positional[1]); to {
+	req := MoveArgs{ID: id, Commit: *commit}
+	switch to := Status(*rawState); to {
 	case Todo, Doing, Done:
 		req.To = to
 	default:
-		return req, &UsageError{fmt.Sprintf("unknown state %q (want todo, doing or done)", positional[1])}
+		return req, &UsageError{fmt.Sprintf("unknown state %q (want todo, doing or done)", *rawState)}
 	}
 	return req, nil
 }
@@ -376,17 +345,16 @@ type BoardArgs struct {
 
 // ParseBoardArgs parses "za board" arguments.
 func ParseBoardArgs(args []string) (BoardArgs, error) {
-	fs := flag.NewFlagSet("board", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	project := fs.String("project", "", "only issues naming +<id>")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
+	p := argparse.NewArgumentParser("board", "")
+	project := p.String("-project")
+	if err := p.Parse(args); err != nil {
+		if errors.Is(err, argparse.ErrHelp) {
 			return BoardArgs{}, err
 		}
+		if strings.Contains(err.Error(), "unrecognized positional argument") {
+			return BoardArgs{}, &UsageError{"unexpected arguments after the flags"}
+		}
 		return BoardArgs{}, &UsageError{err.Error()}
-	}
-	if rest := fs.Args(); len(rest) > 0 {
-		return BoardArgs{}, &UsageError{"unexpected arguments after the flags"}
 	}
 	return BoardArgs{Project: *project}, nil
 }

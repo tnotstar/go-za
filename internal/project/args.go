@@ -12,7 +12,7 @@ const Usage = `Usage:
   za project <command> [arguments]
 
 Commands:
-  add     Add a Go repository as a workspace project
+  add     Add a Go or Rust repository as a workspace project
 
 Run "za project <command> --help" for details about a command.
 `
@@ -25,9 +25,17 @@ Add the repository at <repo-url> to the enclosing za workspace as the
 top-level Git submodule <project-id>/, where <project-id> is the last
 component of <repo-url> without a trailing ".git".
 
-The command:
+The command detects the project language after cloning:
+  - a root go.mod makes a Go project: it is added to the root go.work with
+    "go work use";
+  - a root Cargo.toml makes a Rust project: it must be a single root crate
+    ([package] without [workspace], no nested Cargo.toml), and it is added
+    to the members of the root Cargo.toml and verified offline with
+    "cargo metadata --no-deps --offline";
+  - both or neither at the repository root are rejected.
+
+For every project it:
   - runs "git submodule add -- <repo-url> <project-id>";
-  - requires <project-id>/go.mod and runs "go work use ./<project-id>";
   - creates the private context .agents/context/<project-id>/;
   - adds the project route to the za-managed region of AGENTS.md;
   - stages the whole change without committing it.
@@ -35,8 +43,9 @@ The command:
 It never writes to the project repository. If any step fails, the workspace
 is rolled back to its previous state.
 
-Requirements: a schema-4 Go-enabled za workspace (za.toml), with a committed
-bootstrap and no uncommitted changes; executables git and go.
+Requirements: a schema-4 Go- and/or Rust-enabled za workspace (za.toml),
+with a committed bootstrap and no uncommitted changes; executables git and
+go for Go projects, cargo and rustc (1.85.0 or newer) for Rust projects.
 `
 
 // UsageError reports invalid command-line usage.

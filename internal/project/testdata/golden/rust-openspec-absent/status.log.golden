@@ -1,0 +1,9 @@
+# Execution Log: pub
+
+Chronological change journal, first-class alongside status.md. One entry per line in append order; format:
+
+`[ISO-8601-UTC] [Agent] VERB (I-NNNNNN): description`
+
+Uppercase verb tags record the kind of change (INITIALIZE, BACKFILL, FEATURE, FIX, MIGRATE, ADOPT, ...); the `(I-NNNNNN)` issue reference is optional. Append entries; never rewrite or reorder history.
+
+[2026-10-01T12:00:00Z] [za] INITIALIZE: registered this project; pinned gitlink recorded in status.md (verification pending)

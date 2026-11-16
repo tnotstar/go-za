@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tnotstar/go-za/internal/cargo"
 	"github.com/tnotstar/go-za/internal/manifest"
 	"github.com/tnotstar/go-za/internal/tool"
 )
@@ -31,7 +32,10 @@ type Env struct {
 type Result struct {
 	ID       string
 	URL      string
-	Module   string // module path from go.mod; empty if it could not be read
+	Language string // "go" or "rust"
+	Module   string // Go: module path from go.mod; empty if it could not be read
+	Crate    string // Rust: [package].name from Cargo.toml
+	Edition  string // Rust: [package].edition, empty when unspecified
 	OpenSpec bool
 	Gitlink  string
 }
@@ -42,20 +46,30 @@ func (r Result) Summary() string {
 	if r.OpenSpec {
 		authority = r.ID + "/openspec/ (detected; confirm authority)"
 	}
-	module := "added to go.work"
-	if r.Module != "" {
-		module = r.Module + " (added to go.work)"
+	identity := "Go module:  added to go.work"
+	if r.Language == "rust" {
+		crate := r.Crate
+		if crate == "" {
+			crate = r.ID
+		}
+		edition := "; edition unspecified"
+		if r.Edition != "" {
+			edition = "; edition " + r.Edition
+		}
+		identity = "Rust crate:  " + crate + " (added to /Cargo.toml members" + edition + ")"
+	} else if r.Module != "" {
+		identity = "Go module:  " + r.Module + " (added to go.work)"
 	}
 	return fmt.Sprintf(`Added project %q
   Repository: %s
   Project:    %s/
   Context:    %s/%s/
-  Go module:  %s
+  %s
   Requirement authority: %s
   Pinned gitlink: %s (context verification pending)
 
 Changes are staged but not committed.
-`, r.ID, r.URL, r.ID, contextDir, r.ID, module, authority, r.Gitlink)
+`, r.ID, r.URL, r.ID, contextDir, r.ID, identity, authority, r.Gitlink)
 }
 
 // Add registers repoURL as a top-level Git submodule of the enclosing za
@@ -102,6 +116,9 @@ type adder struct {
 	inject func(step string) error
 
 	root, url, id string
+	ws            manifest.Workspace
+	lang          string // "go" or "rust"; set when the clone is validated
+	cargoPin      string // rustup toolchain pin from preflight; "" when native
 	templates     map[string][]byte
 	agents        []byte // AGENTS.md with the new route
 	saved         []snapshot
@@ -127,16 +144,26 @@ func prepare(ctx context.Context, repoURL string, env Env) (*adder, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !m.Workspace.Go {
-		return nil, errors.New("za project add currently requires a Go-enabled workspace (workspace.go = true in za.toml)")
+	if !m.Workspace.Go && !m.Workspace.Rust {
+		return nil, errors.New("za project add requires a Go- or Rust-enabled workspace (workspace.go or workspace.rust = true in za.toml)")
 	}
-	for _, name := range []string{"git", "go"} {
+	tools := []string{"git"}
+	if m.Workspace.Go {
+		tools = append(tools, "go")
+	}
+	for _, name := range tools {
 		if _, err := env.Runner.LookPath(name); err != nil {
 			return nil, fmt.Errorf("za project add requires executable %q, which was not found in PATH", name)
 		}
 	}
-
-	a := &adder{ctx: ctx, runner: env.Runner, now: env.Now, root: root, url: repoURL, id: id}
+	a := &adder{ctx: ctx, runner: env.Runner, now: env.Now, root: root, url: repoURL, id: id, ws: m.Workspace}
+	if m.Workspace.Rust {
+		pin, err := cargo.Preflight(ctx, env.Runner)
+		if err != nil {
+			return nil, err
+		}
+		a.cargoPin = pin
+	}
 	if err := a.preflightGit(); err != nil {
 		return nil, err
 	}
@@ -301,11 +328,23 @@ func (a *adder) preflightCaseCollisions() error {
 // preflightFiles reads every file the run edits or derives content from,
 // and renders all content that does not depend on the cloned repository.
 func (a *adder) preflightFiles() error {
-	if info, err := os.Lstat(filepath.Join(a.root, "go.work")); err != nil || !info.Mode().IsRegular() {
-		return errors.New("the Go-enabled workspace has no go.work at its root; recreate it with \"go work init\"")
+	snapshotList := []string{".gitmodules", "AGENTS.md"}
+	if a.ws.Go {
+		if info, err := os.Lstat(filepath.Join(a.root, "go.work")); err != nil || !info.Mode().IsRegular() {
+			return errors.New("the Go-enabled workspace has no go.work at its root; recreate it with \"go work init\"")
+		}
+		snapshotList = append(snapshotList, "go.work", "go.work.sum")
+	}
+	if a.ws.Rust {
+		snapshotList = append(snapshotList, "Cargo.toml", "Cargo.lock")
+		if m, err := parseCargoManifest(filepath.Join(a.root, "Cargo.toml")); err != nil {
+			return fmt.Errorf("the Rust-enabled workspace has an invalid Cargo.toml: %w", err)
+		} else if m.Workspace == nil {
+			return errors.New("the Rust-enabled workspace has no [workspace] table in its root Cargo.toml; recreate it with \"za init --rust\"")
+		}
 	}
 
-	for _, rel := range []string{".gitmodules", "go.work", "go.work.sum", "AGENTS.md"} {
+	for _, rel := range snapshotList {
 		s := snapshot{rel: rel}
 		p := filepath.Join(a.root, rel)
 		info, err := os.Lstat(p)
@@ -335,12 +374,19 @@ func (a *adder) preflightFiles() error {
 	if a.templates, err = readTemplates(a.root); err != nil {
 		return err
 	}
-	// Prove the templates accept every fact combination before mutating.
-	for _, openspec := range []bool{false, true} {
-		for _, goSum := range []bool{false, true} {
-			f := facts{ID: a.id, Gitlink: strings.Repeat("0", 40), Date: "2006-01-02", Timestamp: "2006-01-02T12:00:00Z", OpenSpec: openspec, GoSum: goSum}
-			if _, err := renderContext(a.templates, f); err != nil {
-				return err
+	// Prove the templates accept every fact combination for both
+	// languages before mutating anything.
+	for _, lang := range []string{"go", "rust"} {
+		for _, openspec := range []bool{false, true} {
+			for _, lock := range []bool{false, true} {
+				f := facts{
+					ID: a.id, Language: lang, Name: "probe", Edition: "2021",
+					Gitlink: strings.Repeat("0", 40), Date: "2006-01-02", Timestamp: "2006-01-02T12:00:00Z",
+					OpenSpec: openspec, GoSum: lock, CargoLock: lock,
+				}
+				if _, err := renderContext(a.templates, f); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -398,26 +444,77 @@ func (a *adder) run() (Result, error) {
 	}
 
 	err = a.step("validate", func() error {
-		info, err := os.Lstat(filepath.Join(projectDir, "go.mod"))
-		if err != nil || !info.Mode().IsRegular() {
-			return fmt.Errorf("project %q is not a supported root Go module: %s/go.mod not found (nested modules are not supported yet)", a.id, a.id)
+		hasGoMod := regularFile(filepath.Join(projectDir, "go.mod"))
+		hasCargo := regularFile(filepath.Join(projectDir, "Cargo.toml"))
+		switch {
+		case hasGoMod && hasCargo:
+			return fmt.Errorf("ambiguous project root in %s: found both go.mod and Cargo.toml", a.id)
+		case !hasGoMod && !hasCargo:
+			return fmt.Errorf("project %q matches no supported language: neither go.mod nor Cargo.toml found in %s", a.id, a.id)
+		case hasGoMod:
+			a.lang = "go"
+			if !a.ws.Go {
+				return fmt.Errorf("the workspace is not Go-enabled (workspace.go = false in za.toml); it cannot onboard the Go project %q", a.id)
+			}
+			res.Module = modulePath(filepath.Join(projectDir, "go.mod"))
+			ctxFacts = facts{ID: a.id, Language: "go", Name: res.Module}
+		default:
+			a.lang = "rust"
+			if !a.ws.Rust {
+				return fmt.Errorf("the workspace is not Rust-enabled (workspace.rust = false in za.toml); it cannot onboard the Rust project %q", a.id)
+			}
+			m, err := parseCargoManifest(filepath.Join(projectDir, "Cargo.toml"))
+			if err != nil {
+				return fmt.Errorf("project %q has an invalid Cargo.toml: %w", a.id, err)
+			}
+			if m.Workspace != nil {
+				return fmt.Errorf("project %q declares a [workspace] table in its root Cargo.toml: za onboards single-root Rust crates only, because Cargo rejects nested workspace roots; restructure the repository as one root [package] without [workspace]", a.id)
+			}
+			if m.Package == nil || m.Package.Name == "" {
+				return fmt.Errorf("project %q is not a single-root crate: no [package] table with a package.name in its root Cargo.toml", a.id)
+			}
+			if !isCrateName(m.Package.Name) {
+				return fmt.Errorf("project %q declares an unsupported crate name %q in its root Cargo.toml", a.id, m.Package.Name)
+			}
+			if m.Package.Edition != "" && !isEdition(m.Package.Edition) {
+				return fmt.Errorf("project %q declares an unsupported edition %q in its root Cargo.toml", a.id, m.Package.Edition)
+			}
+			nested, err := scanNestedManifests(projectDir)
+			if err != nil {
+				return err
+			}
+			if len(nested) > 0 {
+				return fmt.Errorf("project %q contains nested Cargo.toml manifests, which za rejects for single-root crates: %s", a.id, strings.Join(nested, ", "))
+			}
+			res.Crate, res.Edition = m.Package.Name, m.Package.Edition
+			ctxFacts = facts{ID: a.id, Language: "rust", Name: m.Package.Name, Edition: m.Package.Edition}
 		}
+		res.Language = a.lang
+
+		var err error
 		if res.Gitlink, err = a.gitlink(); err != nil {
 			return err
 		}
 		if info, err := os.Stat(filepath.Join(projectDir, "openspec")); err == nil && info.IsDir() {
 			res.OpenSpec = true
 		}
-		goSum, err := exists(filepath.Join(projectDir, "go.sum"))
-		if err != nil {
-			return err
-		}
-		res.Module = modulePath(filepath.Join(projectDir, "go.mod"))
-		ctxFacts = facts{
-			ID: a.id, Gitlink: res.Gitlink,
-			Date:      a.now().Format(time.DateOnly),
-			Timestamp: a.now().UTC().Format(time.RFC3339),
-			OpenSpec:  res.OpenSpec, GoSum: goSum,
+		ctxFacts.Gitlink = res.Gitlink
+		ctxFacts.Date = a.now().Format(time.DateOnly)
+		ctxFacts.Timestamp = a.now().UTC().Format(time.RFC3339)
+		ctxFacts.OpenSpec = res.OpenSpec
+		switch a.lang {
+		case "go":
+			goSum, err := exists(filepath.Join(projectDir, "go.sum"))
+			if err != nil {
+				return err
+			}
+			ctxFacts.GoSum = goSum
+		case "rust":
+			lock, err := exists(filepath.Join(projectDir, "Cargo.lock"))
+			if err != nil {
+				return err
+			}
+			ctxFacts.CargoLock = lock
 		}
 		return nil
 	})
@@ -425,19 +522,49 @@ func (a *adder) run() (Result, error) {
 		return Result{}, err
 	}
 
-	err = a.step("gowork", func() error {
-		// An explicit GOWORK pins the workspace file, so no other go.work
-		// and no inherited GOWORK value can be selected instead.
-		if err := a.runner.Run(a.ctx, tool.Command{
-			Name: "go", Args: []string{"work", "use", "./" + a.id}, Dir: a.root,
-			Env: []string{"GOWORK=" + filepath.Join(a.root, "go.work")},
-		}); err != nil {
-			return fmt.Errorf("add project to go.work: %w", err)
+	if a.lang == "go" {
+		err = a.step("gowork", func() error {
+			// An explicit GOWORK pins the workspace file, so no other go.work
+			// and no inherited GOWORK value can be selected instead.
+			if err := a.runner.Run(a.ctx, tool.Command{
+				Name: "go", Args: []string{"work", "use", "./" + a.id}, Dir: a.root,
+				Env: []string{"GOWORK=" + filepath.Join(a.root, "go.work")},
+			}); err != nil {
+				return fmt.Errorf("add project to go.work: %w", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return Result{}, err
 		}
-		return nil
-	})
-	if err != nil {
-		return Result{}, err
+	}
+
+	if a.lang == "rust" {
+		err = a.step("members", func() error {
+			if err := addWorkspaceMember(a.root, a.id); err != nil {
+				return err
+			}
+			// Prove with real Cargo that the edited workspace still
+			// resolves, offline, without dependency resolution.
+			if _, err := cargo.MetadataFor(a.ctx, a.runner, a.root, a.cargoPin); err != nil {
+				return err
+			}
+			// The no-deps offline metadata run must not create a
+			// lockfile; za never writes one.
+			if a.original("Cargo.lock") == nil {
+				ok, err := exists(filepath.Join(a.root, "Cargo.lock"))
+				if err != nil {
+					return err
+				}
+				if ok {
+					return errors.New("cargo metadata created a root Cargo.lock unexpectedly; za never writes lockfiles")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return Result{}, err
+		}
 	}
 
 	err = a.step("context", func() error {
@@ -462,6 +589,13 @@ func (a *adder) run() (Result, error) {
 		return Result{}, err
 	}
 	return res, nil
+}
+
+// regularFile reports whether p is an existing regular file, without
+// following a final symlink.
+func regularFile(p string) bool {
+	info, err := os.Lstat(p)
+	return err == nil && info.Mode().IsRegular()
 }
 
 // gitlink returns the full commit ID staged for the submodule.
@@ -495,11 +629,17 @@ func isHexSHA(s string) bool {
 // else changed, including inside the public submodule.
 func (a *adder) stage() error {
 	ctxRel := path.Join(contextDir, a.id)
-	paths := []string{".gitmodules", a.id, "go.work", "AGENTS.md", ctxRel}
-	if ok, err := exists(filepath.Join(a.root, "go.work.sum")); err != nil {
-		return err
-	} else if ok {
-		paths = append(paths, "go.work.sum")
+	paths := []string{".gitmodules", a.id, "AGENTS.md", ctxRel}
+	switch a.lang {
+	case "go":
+		paths = append(paths, "go.work")
+		if ok, err := exists(filepath.Join(a.root, "go.work.sum")); err != nil {
+			return err
+		} else if ok {
+			paths = append(paths, "go.work.sum")
+		}
+	case "rust":
+		paths = append(paths, "Cargo.toml")
 	}
 	if _, err := a.git(append([]string{"add", "--"}, paths...)...); err != nil {
 		return fmt.Errorf("stage project addition: %w", err)

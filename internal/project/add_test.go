@@ -195,7 +195,7 @@ func capture(t *testing.T, root string) state {
 		gitConfig: readFile(t, filepath.Join(root, ".git", "config")),
 		files:     map[string]string{},
 	}
-	for _, rel := range append(trackedFiles, ".gitmodules", "go.work.sum") {
+	for _, rel := range append(trackedFiles, ".gitmodules", "go.work.sum", "Cargo.toml", "Cargo.lock") {
 		if data, err := os.ReadFile(filepath.Join(root, rel)); err == nil {
 			s.files[rel] = string(data)
 		}
@@ -445,14 +445,22 @@ func TestAddRealGitFailures(t *testing.T) {
 		err   string
 	}{
 		{
-			name:  "no go.mod",
+			name:  "no root manifest",
 			files: map[string]string{"README.md": "x\n"},
-			err:   `project "pub" is not a supported root Go module: pub/go.mod not found`,
+			err:   `matches no supported language: neither go.mod nor Cargo.toml found in pub`,
 		},
 		{
 			name:  "nested module only",
 			files: map[string]string{"services/api/go.mod": "module example.com/api\n\ngo 1.24\n"},
-			err:   "pub/go.mod not found",
+			err:   "neither go.mod nor Cargo.toml found in pub",
+		},
+		{
+			name: "ambiguous root",
+			files: map[string]string{
+				"go.mod":     "module example.com/pub\n\ngo 1.24\n",
+				"Cargo.toml": "[package]\nname = \"pub\"\nversion = \"0.1.0\"\n",
+			},
+			err: "ambiguous project root in pub: found both go.mod and Cargo.toml",
 		},
 		{
 			name:  "unreachable repository",
@@ -498,8 +506,8 @@ func TestAddRealGitFailures(t *testing.T) {
 				t.Fatalf("err = %v, want containing %q", err, tt.err)
 			}
 			assertRestored(t, root, "pub", before)
-			if tt.name == "no go.mod" && present(t, filepath.Join(pub, "go.mod")) {
-				t.Error("go.mod was created")
+			if tt.name == "no root manifest" && (present(t, filepath.Join(pub, "go.mod")) || present(t, filepath.Join(pub, "Cargo.toml"))) {
+				t.Error("a root manifest was created")
 			}
 		})
 	}
@@ -666,11 +674,14 @@ func TestAddNotAGitRepository(t *testing.T) {
 // Fake-runner tests: failures detected before any native command runs.
 func TestAddPreflightWithoutCommands(t *testing.T) {
 	goManifest := "schema = 4\n\n[workspace]\ngo = true\npython = false\n"
+	rustManifest := "schema = 4\n\n[workspace]\ngo = false\npython = false\nrust = true\n"
 	tests := []struct {
 		name     string
 		manifest string // empty: no za.toml at all
 		url      string
 		missing  string
+		respond  func(tool.Command) ([]byte, error)
+		probes   bool // read-only toolchain probes are expected before the error
 		err      string
 	}{
 		{name: "not inside workspace", url: "https://h/o/pub.git", err: "not inside a za workspace"},
@@ -679,10 +690,24 @@ func TestAddPreflightWithoutCommands(t *testing.T) {
 		{name: "unsupported schema 2", manifest: "schema = 2\n", url: "https://h/o/pub.git", err: "unsupported za workspace schema: 2"},
 		{name: "unsupported schema 1", manifest: "schema = 1\n[workspace]\ngo = true\npython = false\n", url: "https://h/o/pub.git", err: "unsupported za workspace schema: 1"},
 		{name: "missing workspace table", manifest: "schema = 4\n", url: "https://h/o/pub.git", err: "missing [workspace] table"},
-		{name: "go disabled", manifest: "schema = 4\n[workspace]\ngo = false\npython = true\n", url: "https://h/o/pub.git", err: "requires a Go-enabled workspace"},
+		{name: "no language enabled", manifest: "schema = 4\n[workspace]\ngo = false\npython = true\n", url: "https://h/o/pub.git", err: "requires a Go- or Rust-enabled workspace"},
 		{name: "missing git", manifest: goManifest, url: "https://h/o/pub.git", missing: "git", err: `requires executable "git"`},
 		{name: "missing go", manifest: goManifest, url: "https://h/o/pub.git", missing: "go", err: `requires executable "go"`},
 		{name: "invalid project id", manifest: goManifest, url: "https://h/o/..", err: "cannot derive a project ID"},
+		{name: "rust workspace without cargo", manifest: rustManifest, url: "https://h/o/pub.git", missing: "cargo", err: `Rust capability requested but executable "cargo" was not found in PATH`},
+		{name: "rust workspace with old cargo", manifest: rustManifest, url: "https://h/o/pub.git",
+			respond: func(c tool.Command) ([]byte, error) {
+				switch {
+				case c.Name == "rustup":
+					return []byte("stable-x86_64-unknown-linux-gnu (default)\n"), nil
+				case c.Name == "cargo" && slices.Contains(c.Args, "--version"):
+					return []byte("cargo 1.80.0 (deadbeef 2020-01-01)\n"), nil
+				default:
+					return nil, fmt.Errorf("%s: simulated failure", c)
+				}
+			},
+			probes: true,
+			err:    "cargo 1.80.0 is older than the supported floor 1.85.0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -696,7 +721,7 @@ func TestAddPreflightWithoutCommands(t *testing.T) {
 			if err := os.Mkdir(child, 0o755); err != nil {
 				t.Fatal(err)
 			}
-			f := &tooltest.Fake{Missing: map[string]bool{tt.missing: true}}
+			f := &tooltest.Fake{Missing: map[string]bool{tt.missing: true}, Respond: tt.respond}
 			if _, err := manifest.Find(filepath.Dir(root)); tt.manifest == "" && err == nil {
 				t.Skip("a za.toml encloses the temporary directory")
 			}
@@ -705,7 +730,15 @@ func TestAddPreflightWithoutCommands(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tt.err) {
 				t.Fatalf("err = %v, want containing %q", err, tt.err)
 			}
-			if len(f.Calls) > 0 {
+			if tt.probes {
+				// Read-only toolchain probes may run; nothing that
+				// touches the workspace may.
+				for _, c := range f.Calls {
+					if c.Name == "git" {
+						t.Errorf("git ran before the failure: %v", c)
+					}
+				}
+			} else if len(f.Calls) > 0 {
 				t.Errorf("native commands ran: %v", f.Calls)
 			}
 		})

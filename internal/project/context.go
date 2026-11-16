@@ -29,11 +29,15 @@ var contextFiles = []string{"AGENTS.md", "adr.md", "sot.md", "status.md", "statu
 // project. Everything else stays a <discover: ...> or <decide: ...> placeholder.
 type facts struct {
 	ID        string
+	Language  string // "go" or "rust"
+	Name      string // Go module path or Rust package name; informational only
+	Edition   string // Rust [package].edition; "" when unspecified
 	Gitlink   string // full SHA of the staged submodule gitlink
 	Date      string // YYYY-MM-DD
 	Timestamp string // RFC 3339 UTC instant of the registration, for status.log
 	OpenSpec  bool   // <id>/openspec/ exists
-	GoSum     bool   // <id>/go.sum exists
+	GoSum     bool   // <id>/go.sum exists (go)
+	CargoLock bool   // <id>/Cargo.lock exists (rust)
 }
 
 // readTemplates loads the project templates of the workspace at root.
@@ -90,10 +94,6 @@ func renderContext(templates map[string][]byte, f facts) (map[string][]byte, err
 
 func contextEdits(f facts) []edit {
 	id := f.ID
-	goSum := "not applicable"
-	if f.GoSum {
-		goSum = "`" + id + "/go.sum`"
-	}
 
 	// OpenSpec is optional and its existence does not make it authoritative:
 	// detection is recorded as a candidate, never as accepted authority.
@@ -111,12 +111,7 @@ func contextEdits(f facts) []edit {
 		{"sot.md", "<discover: current behavior location>", behaviorCurrent},
 		{"sot.md", "<discover: proposed behavior authority>", behaviorAuthority},
 		{"sot.md", "<discover: proposed behavior location>", behaviorProposed},
-		{"sot.md", "<discover: `" + id + "/go.sum` or not applicable>", goSum},
-		{"sot.md", "<discover: `/go.work` or not applicable>", "`/go.work`"},
 
-		{"tools.md",
-			"| Go | <discover: yes/no> | <discover: version source and invocation> |",
-			"| Go | yes | version source `" + id + "/go.mod`; <discover: invocation> |"},
 		{"tools.md",
 			"| OpenSpec | <discover: yes/no> | <discover: CLI / agent skill / not adopted> |",
 			openSpecRow},
@@ -141,6 +136,48 @@ func contextEdits(f facts) []edit {
 		// deterministic for golden tests.
 		{"status.log", "[<iso-8601-utc>]", "[" + f.Timestamp + "]"},
 	}
+
+	if f.Language == "rust" {
+		lock := "not applicable"
+		if f.CargoLock {
+			lock = "`" + id + "/Cargo.lock`"
+		}
+		edition := "unspecified"
+		if f.Edition != "" {
+			edition = f.Edition
+		}
+		edits = append(edits,
+			// Whole rows: the per-cell placeholders are not unique across
+			// the Python and Cargo dependency rows.
+			edit{"sot.md",
+				"| Go dependencies | `" + id + "` repository | `" + id + "/go.mod` | <discover: `" + id + "/go.sum` or not applicable> |",
+				"| Go dependencies | not applicable | not applicable | not applicable (no go.mod) |"},
+			edit{"sot.md",
+				"| Cargo dependencies | <discover: `" + id + "` repository or not applicable> | <discover: `" + id + "/Cargo.toml` or not applicable> | <discover: `" + id + "/Cargo.lock` or not applicable> |",
+				"| Cargo dependencies | `" + id + "` repository | `" + id + "/Cargo.toml` | " + lock + " |"},
+			edit{"sot.md", "<discover: `/go.work` or not applicable>", "not applicable"},
+			edit{"sot.md", "<discover: `/Cargo.toml` or not applicable>", "`/Cargo.toml` (workspace members)"},
+			edit{"tools.md",
+				"| Go | <discover: yes/no> | <discover: version source and invocation> |",
+				"| Go | no | not applicable |"},
+			edit{"tools.md",
+				"| Rust | <discover: yes/no> | <discover: version source and invocation> |",
+				"| Rust | yes | version source `" + id + "/Cargo.toml` (edition " + edition + "); <discover: invocation> |"},
+		)
+		return edits
+	}
+
+	goSum := "not applicable"
+	if f.GoSum {
+		goSum = "`" + id + "/go.sum`"
+	}
+	edits = append(edits,
+		edit{"sot.md", "<discover: `" + id + "/go.sum` or not applicable>", goSum},
+		edit{"sot.md", "<discover: `/go.work` or not applicable>", "`/go.work`"},
+		edit{"tools.md",
+			"| Go | <discover: yes/no> | <discover: version source and invocation> |",
+			"| Go | yes | version source `" + id + "/go.mod`; <discover: invocation> |"},
+	)
 	return edits
 }
 

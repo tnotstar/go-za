@@ -16,7 +16,7 @@ projects may be public, client-private or otherwise restricted.
 | Command | Status |
 |---|---|
 | `za init` | Initializes an empty directory as a meta-workspace |
-| `za project add` | Adds one root-module Go repository as a project (first minimal version) |
+| `za project add` | Adds one root-module Go repository or one single-root Rust crate as a project |
 | `za issue` | Manages the workspace issue records in `.za/issues/` and assembles agent prompts |
 | `za board` | Renders the Kanban view of the workspace issues |
 | `za wiki` | Manages the workspace wiki pages in `.za/wiki/` |
@@ -162,9 +162,16 @@ Ownership and reproducibility:
   Once a package is a workspace member, Cargo uses the workspace lockfile
   for that invocation, regardless of the project's own on-disk lockfile.
 
-Rust project onboarding (registering Cargo members, existing-workspace
-handling, dependency wiring) is future work. Registering a project with
-`za project add` does not touch Cargo membership, and `exclude =
+Rust project onboarding through `za project add` covers **single-root
+crates**: a repository whose root `Cargo.toml` declares `[package]` without
+`[workspace]` joins the root workspace `members` array and is verified
+offline with `cargo metadata --no-deps`. Repositories that are themselves
+Cargo workspaces (virtual manifests, composite package-plus-workspace,
+multi-crate monorepos) are rejected with a diagnostic and a clean rollback:
+Cargo itself forbids nested workspace roots, so they cannot be members.
+Dependency wiring, existing-workspace adoption beyond `za init` scaffolds,
+and Python onboarding remain future work. Registering any project never
+touches Cargo membership of unrelated workspaces, and `exclude =
 [".worktrees"]` keeps task worktrees out of the integration workspace —
 though exclusion from membership does not isolate ancestor Cargo
 configuration; see `tooling.md` in a generated workspace.
@@ -188,10 +195,9 @@ za project add <repo-url>
 ```
 
 Adds the repository at `<repo-url>` to the enclosing workspace as a project.
-This is the **first, minimal implementation**: it registers one root-module
-Go project and is not yet a general project lifecycle manager. `za` neither
-knows nor changes a repository's visibility; it registers whatever URL you
-pass.
+It registers **Go** and **Rust** repositories and is not yet a general
+project lifecycle manager. `za` neither knows nor changes a repository's
+visibility; it registers whatever URL you pass.
 
 ```bash
 za project add https://github.com/tnotstar/go-za.git
@@ -209,9 +215,18 @@ fails. There is no `--name`, `--branch` or `--force` yet.
 - Run it from the workspace root or any directory below it. The nearest
   `za.toml` above the current directory identifies the workspace; `go.work`,
   `.agents/` or `.git/` alone never do.
-- `za.toml` must have `schema = 4` and `workspace.go = true`. Only **Go**
-  projects are supported, and the module must be at the repository root
-  (`<project-id>/go.mod`). Repositories with nested modules only are rejected.
+- `za.toml` must have `schema = 4` and `workspace.go = true` and/or
+  `workspace.rust = true`. The project language is detected after cloning:
+  a **Go** project carries its module at the repository root
+  (`<project-id>/go.mod`; repositories with nested modules only are
+  rejected), and a **Rust** project must be a *single root crate*: a
+  `<project-id>/Cargo.toml` with a `[package]` table, no `[workspace]`
+  table, and no nested `Cargo.toml` anywhere below the root. Cargo rejects
+  nested workspace roots, so a repository that is itself a Cargo workspace
+  (virtual manifest or composite package-plus-workspace) cannot join the
+  root workspace and is rejected with a diagnostic; a repository with both
+  `go.mod` and `Cargo.toml` at its root is rejected as ambiguous, and one
+  with neither is rejected naming both probes.
 - The workspace must be the top level of a Git working tree with at least
   one commit (commit the `za init` bootstrap first) and **no staged, unstaged
   or untracked changes**. `za` never stashes, discards or commits for you.
@@ -220,28 +235,49 @@ fails. There is no `--name`, `--branch` or `--force` yet.
   must not exist yet. Project IDs must not collide with reserved workspace or
   context names, including case-equivalent variants (so `issues`,
   `templates`, `policy.md` or `Policy.md` are all rejected).
-- `git` and `go` must be in `PATH`.
+- `git` must be in `PATH`, plus `go` for a Go project and `cargo`/`rustc`
+  (1.85.0 or newer) for a Rust project. In a Go-enabled workspace the root
+  `go.work` must exist; in a Rust-enabled workspace the root `Cargo.toml`
+  must carry a `[workspace]` table. The Rust toolchain preflight follows
+  `za init`: fully offline, `RUSTUP_AUTO_INSTALL=0`, and `RUSTUP_TOOLCHAIN`
+  pinned to the preflight selection when rustup manages the installation.
 
 ### What it does
 
 ```text
 git submodule add -- <repo-url> <project-id>
+
+# Go project:
 GOWORK=<workspace>/go.work go work use ./<project-id>
+
+# Rust project (deterministic textual insert, lexically sorted):
+<workspace>/Cargo.toml [workspace] members += "<project-id>"
+cargo metadata --format-version 1 --no-deps --offline --manifest-path <workspace>/Cargo.toml
 ```
 
 1. Adds the repository as the top-level submodule `<project-id>/`. No branch
    is guessed or configured; Git follows the remote `HEAD`.
-2. Verifies `<project-id>/go.mod`. It never runs `go mod init`, `go mod tidy`
-   or `go get`, and never builds or tests the project.
-3. Adds the module to the root `go.work` with `go work use`. The Go toolchain
-   owns the result, for example an updated `go` directive.
+2. Detects the language and validates the root manifest: `<project-id>/go.mod`
+   for Go, or the single-root-crate `Cargo.toml` for Rust. It never runs
+   `go mod init`, `go mod tidy`, `go get`, `cargo new` or `cargo add`, and
+   never builds or tests the project.
+3. Registers the project with its workspace: the Go module joins the root
+   `go.work` through `go work use` (the Go toolchain owns the result, for
+   example an updated `go` directive); the Rust crate is inserted into the
+   root `Cargo.toml` `[workspace]` `members` array by a deterministic textual
+   edit that keeps the array sorted and preserves comments and formatting
+   elsewhere (uneditable shapes fail closed), and the edited workspace is
+   then proven with real Cargo through the offline, no-deps `cargo metadata`.
+   `za` never writes a `Cargo.lock`: the validation must not create one, and
+   `go.work.sum` is only staged when the Go toolchain created it.
 4. Creates the private context `.agents/context/<project-id>/` from the
    workspace's own templates in `.agents/context/templates/project/`: the
    project guide `AGENTS.md`, `sot.md`, `status.md`, `tools.md`, the empty
    decision register `adr.md`, an empty `decisions/`, and the execution log
    `status.log` seeded with the registration entry. Only known facts
-   are filled in: the project ID and paths, Go as language, the root
-   `go.work` membership, the bootstrap phase, the date the pin was observed
+   are filled in: the project ID and paths, the detected language, the
+   module or crate identity, the workspace membership (`go.work` or root
+   `Cargo.toml` members), the bootstrap phase, the date the pin was observed
    and the exact gitlink SHA as `Pinned gitlink` in `status.md`.
    Registering does **not** mark anything verified: `status.md` records
    `Verification summary: pending (no scope verified; registration observed
@@ -255,9 +291,10 @@ GOWORK=<workspace>/go.work go work use ./<project-id>
    and `<!-- za:projects:end -->` in `AGENTS.md`, sorted by project ID. The
    rest of the file is not touched. Missing, duplicated or hand-edited markers
    make the command fail.
-6. Stages exactly these changes (`.gitmodules`, the gitlink, `go.work`,
-   `go.work.sum` if Go creates it, `AGENTS.md` and the new context) and
-   **never commits**. Review them with `git diff --cached`.
+6. Stages exactly these changes (`.gitmodules`, the gitlink, `AGENTS.md`, the
+   new context, plus `go.work` and `go.work.sum` for Go or the root
+   `Cargo.toml` for Rust) and **never commits**. Review them with
+   `git diff --cached`.
 
 `za project add` **never writes to the project repository**. OpenSpec is
 optional: if `<project-id>/openspec/` exists, the private context records it
@@ -265,8 +302,9 @@ as a *detected* requirement authority to confirm, not as accepted fact; if
 not, the requirement authority is recorded as `unresolved`. Either way the
 command never creates `openspec/` or a private substitute specification.
 
-`za.toml` is not modified. Project membership lives in `.gitmodules`,
-`go.work`, `.agents/context/<project-id>/` and the `AGENTS.md` routing region.
+`za.toml` is not modified. Project membership lives in `.gitmodules`, the
+language workspace (`go.work` or `Cargo.toml`), `.agents/context/<project-id>/`
+and the `AGENTS.md` routing region.
 
 Only Git contacts the repository, using your normal Git configuration and
 credentials.
@@ -277,8 +315,10 @@ If any step fails or the command is interrupted, `za` rolls the workspace
 back to the clean committed state it started from: it resets the index,
 removes the submodule checkout, its `.git/modules/<project-id>` directory and
 its `.git/config` section, deletes the new context, and restores `AGENTS.md`,
-`go.work` and `.gitmodules` byte for byte. A failed addition can be retried
-with the same command. If rollback cannot complete, `za` says what is left.
+`go.work`, the root `Cargo.toml` and `.gitmodules` byte for byte — including
+a failure after the `members` insert or during the `cargo metadata`
+validation. A failed addition can be retried with the same command. If
+rollback cannot complete, `za` says what is left.
 
 Exit status follows `za init`: `0` success, `1` operational failure, `2`
 invalid usage.
@@ -598,20 +638,32 @@ downgrade path, and no schema bump was needed for this additive capability.
 ## Development
 
 ```bash
-make check         # gofmt check, go vet, unit tests, build
-make integration   # run against the real git, go and uv
-make golden        # regenerate scaffold golden files after template edits
-make help          # list every target
+make check            # gofmt check, go vet, unit tests, build
+make integration      # run against the real git, go and uv
+make integration-cargo # also run the real-cargo Rust tests (cargo/rustc >= 1.85.0)
+make golden           # regenerate scaffold golden files after template edits
+make help             # list every target
 ```
 
 The Makefile needs GNU Make and a POSIX shell; on Windows, use the shell
 shipped with Git for Windows. Every target wraps a plain `go` command, so you
 can also run those directly.
 
-The default test suite needs neither `uv` nor network access. Most tests use
-a fake command runner; the `za project add` tests also run the real `git` and
-`go` against local repositories with an isolated Git configuration. `go test
--short` skips those.
+The default test suite needs neither `uv`, `cargo` nor network access. Most
+tests use a fake command runner; the `za project add` tests also run the real
+`git` and `go` against local repositories with an isolated Git configuration,
+and the Rust onboarding tests fake Cargo deterministically. `go test -short`
+skips the real-tool tests.
+
+### Dependency policy
+
+The default is **zero external Go dependencies**. Nominal exceptions require
+an accepted decision record in the workspace context and are limited to
+implementations of formal specifications the Go standard library does not
+cover, with zero transitive dependencies in `go.sum`. The current allowlist:
+`github.com/BurntSushi/toml` (TOML v1.0.0) for parsing `Cargo.toml`
+manifests; the workspace's own `za.toml` keeps its strict hand-rolled subset
+parser, which encodes schema 4's fail-closed acceptance contract.
 
 The repository forces LF line endings through `.gitattributes`. Templates are
 embedded byte-for-byte and golden tests compare exact bytes, so do not

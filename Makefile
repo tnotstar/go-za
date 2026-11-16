@@ -20,6 +20,7 @@ help:
 	@echo "  test         Run the unit test suite"
 	@echo "  race         Run the unit test suite with the race detector (needs cgo)"
 	@echo "  integration  Run tests against the real git, go and uv"
+	@echo "  integration-cargo Also run the real-cargo Rust tests (cargo/rustc >= 1.85.0)"
 	@echo "  cover        Run tests with coverage and print a summary"
 	@echo "  golden       Regenerate scaffold golden files"
 	@echo "  fmt          Format all Go files"
@@ -51,6 +52,12 @@ integration:
 	$(GO) test -count=1 -run TestRealTools -v ./internal/initcmd
 	$(GO) test -count=1 -run TestAddRealGit -v ./internal/project
 
+.PHONY: integration-cargo
+integration-cargo: export ZA_INTEGRATION = 1
+integration-cargo:
+	$(GO) test -count=1 -run TestRealCargoBoundaries -v ./internal/initcmd
+	$(GO) test -count=1 -run TestAddRealCargoRust -v ./internal/project
+
 .PHONY: cover
 cover:
 	$(GO) test -coverprofile=$(COVER) $(PKGS)
@@ -60,7 +67,7 @@ cover:
 golden:
 	$(GO) test ./internal/scaffold -update
 	$(GO) test ./internal/scaffold
-	$(GO) test ./internal/project -run TestAddRealGitSuccess -update
+	$(GO) test ./internal/project -run 'TestAddRealGitSuccess|TestAddRealGitRust$$' -update
 	$(GO) test ./internal/project
 
 .PHONY: fmt

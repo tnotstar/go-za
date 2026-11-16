@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tnotstar/go-za/internal/cargo"
 	"github.com/tnotstar/go-za/internal/scaffold"
 	"github.com/tnotstar/go-za/internal/tool"
 	"github.com/tnotstar/go-za/internal/workspace"
@@ -126,7 +127,7 @@ func preflight(ctx context.Context, r tool.Runner, opts Options) (string, error)
 	if !opts.Rust {
 		return "", nil
 	}
-	return rustPreflight(ctx, r)
+	return cargo.Preflight(ctx, r)
 }
 
 type initializer struct {

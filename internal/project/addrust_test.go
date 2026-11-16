@@ -403,12 +403,15 @@ func TestAddRealCargoRust(t *testing.T) {
 		}
 	}
 
+	// A mixed Go+Rust workspace: the positive case must register the crate
+	// without touching the Go integration overlay at all.
 	root := filepath.Join(t.TempDir(), "ws")
-	if _, err := initcmd.Run(t.Context(), initcmd.Options{Rust: true, Path: root}, initcmd.Env{Runner: tool.Exec{}}); err != nil {
-		t.Fatalf("za init --rust: %v", err)
+	if _, err := initcmd.Run(t.Context(), initcmd.Options{Go: true, Rust: true, Path: root}, initcmd.Env{Runner: tool.Exec{}}); err != nil {
+		t.Fatalf("za init --go --rust: %v", err)
 	}
 	git(t, root, "add", "--all")
 	git(t, root, "commit", "--quiet", "-m", "bootstrap")
+	goWorkBefore := readFile(t, filepath.Join(root, "go.work"))
 
 	t.Run("single root crate", func(t *testing.T) {
 		pub := publicRepo(t, "pub", rustRepo)
@@ -421,6 +424,13 @@ func TestAddRealCargoRust(t *testing.T) {
 		}
 		if manifest := readFile(t, filepath.Join(root, "Cargo.toml")); !strings.Contains(manifest, "members = [\"pub\"]") {
 			t.Errorf("Cargo.toml members not updated:\n%s", manifest)
+		}
+		if got := readFile(t, filepath.Join(root, "go.work")); got != goWorkBefore {
+			t.Errorf("the Go integration overlay changed:\n%s", got)
+		}
+		staged := strings.Fields(git(t, root, "diff", "--cached", "--name-only"))
+		if slices.Contains(staged, "go.work") || !slices.Contains(staged, "Cargo.toml") {
+			t.Errorf("staged = %v, want Cargo.toml and no go.work", staged)
 		}
 		if present(t, filepath.Join(root, "Cargo.lock")) {
 			t.Error("a root Cargo.lock was created; za never writes lockfiles")
